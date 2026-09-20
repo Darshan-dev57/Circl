@@ -1,6 +1,8 @@
 package com.nearmeet.activity;
 
 import com.nearmeet.TestcontainersConfig;
+import com.nearmeet.support.Users;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -31,6 +33,13 @@ class ActivityApiIT {
     @Autowired
     MockMvc mvc;
 
+    Users.TestUser host;
+
+    @BeforeEach
+    void signUpHost() throws Exception {
+        host = Users.host(mvc);
+    }
+
     private String body(String title, int capacity, String description) {
         String startsAt = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS).toString();
         return """
@@ -41,7 +50,7 @@ class ActivityApiIT {
 
     @Test
     void createReturns201WithLocationAndCleanFields() throws Exception {
-        mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(body("  Cricket   at Cubbon  ", 10, "<script>alert(1)</script>bring a bat")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", containsString("/api/v1/activities/")))
@@ -56,7 +65,7 @@ class ActivityApiIT {
         String bad = """
                 {"title":"","category":"CRICKET","startsAt":"2020-01-01T10:00:00Z","capacity":1,"lat":120,"lng":77}
                 """;
-        mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON).content(bad))
+        mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON).content(bad))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Validation failed"))
                 .andExpect(jsonPath("$.errors", hasSize(4)));
@@ -68,7 +77,7 @@ class ActivityApiIT {
         String req = """
                 {"title":"Trek","category":"TREK","startsAt":"%s","capacity":5,"lat":12.9,"lng":77.5}
                 """.formatted(far);
-        mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON).content(req))
+        mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON).content(req))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("startsAt"));
     }
@@ -76,7 +85,7 @@ class ActivityApiIT {
     @Test
     void typoInFieldNameIsA400() throws Exception {
         String req = body("Coffee", 4, "").replace("\"capacity\"", "\"capcity\"");
-        mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON).content(req))
+        mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON).content(req))
                 .andExpect(status().isBadRequest());
     }
 
@@ -95,13 +104,13 @@ class ActivityApiIT {
 
     @Test
     void deleteOnCollectionIs405() throws Exception {
-        mvc.perform(delete("/api/v1/activities")).andExpect(status().isMethodNotAllowed());
+        mvc.perform(delete("/api/v1/activities").header("Authorization", host.bearer())).andExpect(status().isMethodNotAllowed());
     }
 
     @Test
     void listIsPaged() throws Exception {
         for (int i = 0; i < 3; i++) {
-            mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON)
+            mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON)
                     .content(body("Study " + i, 5, ""))).andExpect(status().isCreated());
         }
         mvc.perform(get("/api/v1/activities").param("size", "2"))
@@ -112,14 +121,14 @@ class ActivityApiIT {
 
     @Test
     void patchUpdatesOnlyGivenFields() throws Exception {
-        String location = mvc.perform(post("/api/v1/activities").contentType(MediaType.APPLICATION_JSON)
+        String location = mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON)
                         .content(body("Badminton", 6, "doubles")))
                 .andReturn().getResponse().getHeader("Location");
-        mvc.perform(patch(location).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":8}"))
+        mvc.perform(patch(location).header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON).content("{\"capacity\":8}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.capacity").value(8))
                 .andExpect(jsonPath("$.title").value("Badminton"));
-        mvc.perform(delete(location)).andExpect(status().isNoContent());
+        mvc.perform(delete(location).header("Authorization", host.bearer())).andExpect(status().isNoContent());
         mvc.perform(get(location)).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
 }
