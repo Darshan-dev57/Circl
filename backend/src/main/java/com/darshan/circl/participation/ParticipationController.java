@@ -1,7 +1,9 @@
 package com.darshan.circl.participation;
 
 import com.darshan.circl.common.web.CurrentUser;
+import com.darshan.circl.participation.dto.JoinRequest;
 import com.darshan.circl.participation.dto.JoinResponse;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,8 +34,10 @@ public class ParticipationController {
     @PostMapping("/join")
     public ResponseEntity<JoinResponse> join(@AuthenticationPrincipal Jwt jwt,
                                              @PathVariable UUID activityId,
-                                             @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 80) String key) {
-        ParticipationService.JoinResult result = service.join(activityId, CurrentUser.id(jwt), key);
+                                             @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 80) String key,
+                                             @Valid @RequestBody(required = false) JoinRequest body) {
+        int partySize = body == null ? 1 : body.partySizeOrDefault();
+        ParticipationService.JoinResult result = service.join(activityId, CurrentUser.id(jwt), partySize, key);
         return ResponseEntity.ok()
                 .header("Idempotent-Replayed", String.valueOf(result.replayed()))
                 .body(result.response());

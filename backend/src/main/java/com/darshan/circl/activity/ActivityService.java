@@ -8,6 +8,7 @@ import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.text.TextSanitizer;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,11 +24,14 @@ public class ActivityService {
 
     private final ActivityRepository activities;
     private final ActivityMapper mapper;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    public ActivityService(ActivityRepository activities, ActivityMapper mapper, Clock clock) {
+    public ActivityService(ActivityRepository activities, ActivityMapper mapper, ApplicationEventPublisher events,
+                           Clock clock) {
         this.activities = activities;
         this.mapper = mapper;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -73,7 +77,7 @@ public class ActivityService {
 
     @Transactional
     public ActivityDetail update(UUID id, UUID userId, boolean admin, UpdateActivityRequest req) {
-        Activity activity = find(id);
+        Activity activity = activities.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Activity", id));
         requireHost(activity, userId, admin);
         if (!activity.isOpen()) {
             throw new RuleViolationException("activity-not-open", "A cancelled activity cannot be edited");
@@ -95,7 +99,11 @@ public class ActivityService {
                 throw new RuleViolationException("capacity-below-seats-taken",
                         "Capacity cannot go below the " + activity.getSeatsTaken() + " seats already taken");
             }
+            boolean grew = req.capacity() > activity.getCapacity();
             activity.setCapacity(req.capacity());
+            if (grew) {
+                events.publishEvent(new ActivityCapacityIncreased(activity));
+            }
         }
         return mapper.toDetail(activity);
     }
