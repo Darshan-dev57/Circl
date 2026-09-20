@@ -34,6 +34,10 @@ server:
     include-stacktrace: never
     include-message: never
 
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-}]"
+
 management:
   endpoints:
     web:
