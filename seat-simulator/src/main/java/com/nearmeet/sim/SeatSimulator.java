@@ -54,7 +54,11 @@ public class SeatSimulator {
     public static void main(String[] args) throws InterruptedException {
         int seats = 10;
         int threads = 100;
-        List<IntFunction<SeatCounter>> counters = List.of(UnsafeSeatCounter::new);
+        List<IntFunction<SeatCounter>> counters = List.of(
+                UnsafeSeatCounter::new,
+                SynchronizedSeatCounter::new,
+                AtomicSeatCounter::new,
+                LockSeatCounter::new);
 
         System.out.printf("%d threads, %d seats%n", threads, seats);
         for (IntFunction<SeatCounter> factory : counters) {
