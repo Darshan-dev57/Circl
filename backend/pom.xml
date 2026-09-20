@@ -11,10 +11,10 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.nearmeet</groupId>
-    <artifactId>nearmeet</artifactId>
+    <groupId>com.darshan.circl</groupId>
+    <artifactId>circl</artifactId>
     <version>0.1.0</version>
-    <name>nearmeet</name>
+    <name>circl</name>
     <description>Find small activities happening near you and join them</description>
 
     <properties>

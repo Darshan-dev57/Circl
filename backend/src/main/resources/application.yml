@@ -1,11 +1,11 @@
 spring:
   application:
-    name: nearmeet
+    name: circl
   datasource:
     # dev defaults match docker-compose.yml; set DB_URL / DB_USER / DB_PASSWORD anywhere else
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/nearmeet}
-    username: ${DB_USER:nearmeet}
-    password: ${DB_PASSWORD:nearmeet}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/circl}
+    username: ${DB_USER:circl}
+    password: ${DB_PASSWORD:circl}
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
       connection-timeout: 3000
@@ -28,11 +28,11 @@ spring:
     problemdetails:
       enabled: true
 
-nearmeet:
+circl:
   jwt:
-    # DEV ONLY default so the app starts on a laptop. Set NEARMEET_JWT_SECRET (32+ bytes) everywhere else.
-    secret: ${NEARMEET_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
-    issuer: nearmeet
+    # DEV ONLY default so the app starts on a laptop. Set CIRCL_JWT_SECRET (32+ bytes) everywhere else.
+    secret: ${CIRCL_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    issuer: circl
     access-ttl: 15m
     refresh-ttl: 7d
   cors:

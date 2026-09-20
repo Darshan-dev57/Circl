@@ -1,28 +1,28 @@
-# Local infrastructure for NearMeet. Start with: docker compose up -d
+# Local infrastructure for Circl. Start with: docker compose up -d
 # Values come from .env (copy .env.example). The defaults below are for local dev only.
 services:
   postgres:
     image: postgis/postgis:16-3.4
-    container_name: nearmeet-postgres
+    container_name: circl-postgres
     # JIT compile time was bigger than the whole nearby query
     command: ["postgres", "-c", "jit=off"]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-nearmeet}
-      POSTGRES_USER: ${POSTGRES_USER:-nearmeet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nearmeet}
+      POSTGRES_DB: ${POSTGRES_DB:-circl}
+      POSTGRES_USER: ${POSTGRES_USER:-circl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-circl}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nearmeet} -d ${POSTGRES_DB:-nearmeet}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-circl} -d ${POSTGRES_DB:-circl}"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: nearmeet-redis
+    container_name: circl-redis
     ports:
       - "6379:6379"
     healthcheck:
