@@ -7,6 +7,8 @@ import com.nearmeet.activity.dto.UpdateActivityRequest;
 import com.nearmeet.common.web.CurrentUser;
 import com.nearmeet.common.web.PageResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.PageRequest;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -57,6 +60,15 @@ public class ActivityController {
                                               @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by("startsAt").ascending().and(Sort.by("id")));
         return PageResponse.of(service.listUpcoming(category, pageable));
+    }
+
+    @GetMapping("/nearby")
+    public List<ActivitySummary> nearby(@RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
+                                        @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lng,
+                                        @RequestParam(defaultValue = "3") @DecimalMin("0.1") @DecimalMax("50.0") double radiusKm,
+                                        @RequestParam(required = false) Category category,
+                                        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+        return service.nearby(lat, lng, radiusKm, category, limit);
     }
 
     @GetMapping("/{id}")
