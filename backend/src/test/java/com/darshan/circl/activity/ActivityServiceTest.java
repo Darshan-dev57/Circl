@@ -25,7 +25,7 @@ class ActivityServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ActivityService(repo, new ActivityMapper(), Clock.systemUTC());
+        service = new ActivityService(repo, new ActivityMapper(), event -> { }, Clock.systemUTC());
     }
 
     @Test
@@ -34,7 +34,7 @@ class ActivityServiceTest {
                 Instant.now().plus(1, ChronoUnit.DAYS), 60, 10);
         a.setSeatsTaken(6);
         UUID id = UUID.randomUUID();
-        when(repo.findById(id)).thenReturn(Optional.of(a));
+        when(repo.findByIdForUpdate(id)).thenReturn(Optional.of(a));
 
         assertThatThrownBy(() -> service.update(id, null, true, new UpdateActivityRequest(null, null, null, null, 5)))
                 .isInstanceOf(RuleViolationException.class)

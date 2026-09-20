@@ -119,7 +119,7 @@ class JoinApiIT {
     }
 
     @Test
-    void leavingFreesTheSeatForTheFirstWaitlistedUser() throws Exception {
+    void leavingOffersTheSeatToTheFirstWaitlistedUser() throws Exception {
         TestUser a = Users.participant(mvc);
         TestUser b = Users.participant(mvc);
         TestUser c = Users.participant(mvc);
@@ -130,9 +130,10 @@ class JoinApiIT {
         mvc.perform(delete("/api/v1/activities/{id}/participants/me", activityId).header("Authorization", a.bearer()))
                 .andExpect(status().isNoContent());
 
-        String cStatus = jdbc.queryForObject("SELECT status FROM participants WHERE activity_id = ? AND user_id = ?",
+        String cStatus = jdbc.queryForObject("SELECT status FROM waitlist WHERE activity_id = ? AND user_id = ?",
                 String.class, activityId, c.id());
-        assertThat(cStatus).isEqualTo("JOINED");
+        assertThat(cStatus).isEqualTo("OFFERED");
+        // the offered seat is held, so the activity still counts as full
         Integer taken = jdbc.queryForObject("SELECT seats_taken FROM activities WHERE id = ?", Integer.class, activityId);
         assertThat(taken).isEqualTo(2);
 

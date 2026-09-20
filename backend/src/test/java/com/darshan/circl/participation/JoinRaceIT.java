@@ -114,7 +114,7 @@ class JoinRaceIT {
 
             runTogether(people.size(), i -> {
                 long start = System.nanoTime();
-                var result = participation.join(activity, people.get(i).getId(), UUID.randomUUID().toString(), strategy);
+                var result = participation.join(activity, people.get(i).getId(), 1, UUID.randomUUID().toString(), strategy);
                 latenciesMicros.add((System.nanoTime() - start) / 1_000);
                 extraAttempts.addAndGet(result.attempts() - 1);
                 if (result.response().status() == JoinOutcome.JOINED) {
@@ -150,7 +150,7 @@ class JoinRaceIT {
 
         runTogether(10, i -> {
             try {
-                var r = participation.join(activity, user.getId(), "double-tap");
+                var r = participation.join(activity, user.getId(), 1, "double-tap");
                 if (r.replayed()) {
                     replays.incrementAndGet();
                 }
