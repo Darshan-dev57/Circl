@@ -24,6 +24,9 @@ public class Activity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "host_id", nullable = false, updatable = false)
+    private UUID hostId;
+
     @Column(nullable = false, length = 80)
     private String title;
 
@@ -69,8 +72,9 @@ public class Activity {
         // for JPA
     }
 
-    public Activity(String title, Category category, String description, double latitude, double longitude,
+    public Activity(UUID hostId, String title, Category category, String description, double latitude, double longitude,
                     Instant startsAt, int durationMinutes, int capacity) {
+        this.hostId = hostId;
         this.title = title;
         this.category = category;
         this.description = description;
@@ -108,7 +112,12 @@ public class Activity {
         this.status = ActivityStatus.CANCELLED;
     }
 
+    public boolean isHostedBy(UUID userId) {
+        return hostId.equals(userId);
+    }
+
     public UUID getId() { return id; }
+    public UUID getHostId() { return hostId; }
     public String getTitle() { return title; }
     public Category getCategory() { return category; }
     public String getDescription() { return description; }
