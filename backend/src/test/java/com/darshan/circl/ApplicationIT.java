@@ -16,6 +16,12 @@ class ApplicationIT {
     TestRestTemplate http;
 
     @Test
+    void apiDocsArePublic() {
+        String docs = http.getForObject("/v3/api-docs", String.class);
+        assertThat(docs).contains("/api/v1/activities/{activityId}/join");
+    }
+
+    @Test
     void healthIsUp() {
         String body = http.getForObject("/actuator/health", String.class);
         assertThat(body).contains("\"status\":\"UP\"");
