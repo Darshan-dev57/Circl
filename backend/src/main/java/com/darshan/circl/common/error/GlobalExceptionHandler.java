@@ -3,6 +3,8 @@ package com.darshan.circl.common.error;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -32,10 +34,31 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final String TYPE_BASE = "https://circl.dev/problems/";
 
     @ExceptionHandler(ApiException.class)
-    ProblemDetail handleApi(ApiException ex) {
+    ResponseEntity<ProblemDetail> handleApi(ApiException ex) {
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
         pd.setType(URI.create(TYPE_BASE + ex.code()));
         pd.setTitle(ex.status().getReasonPhrase());
+        ResponseEntity.BodyBuilder res = ResponseEntity.status(ex.status());
+        if (ex instanceof TooManyRequestsException tooMany) {
+            res.header(HttpHeaders.RETRY_AFTER, String.valueOf(tooMany.retryAfterSeconds()));
+        }
+        return res.body(pd);
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail handleStale(OptimisticLockingFailureException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+                "Someone changed this at the same time, please retry");
+        pd.setType(URI.create(TYPE_BASE + "concurrent-update"));
+        return pd;
+    }
+
+    @ExceptionHandler(RedisConnectionFailureException.class)
+    ProblemDetail handleRedisDown(RedisConnectionFailureException ex) {
+        log.warn("Redis unavailable: {}", ex.getMessage());
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "This feature is temporarily unavailable");
+        pd.setType(URI.create(TYPE_BASE + "unavailable"));
         return pd;
     }
 

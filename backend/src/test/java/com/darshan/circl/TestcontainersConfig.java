@@ -3,6 +3,7 @@ package com.darshan.circl;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -15,5 +16,11 @@ public class TestcontainersConfig {
         DockerImageName postgis = DockerImageName.parse("postgis/postgis:16-3.4")
                 .asCompatibleSubstituteFor("postgres");
         return new PostgreSQLContainer<>(postgis);
+    }
+
+    @Bean
+    @ServiceConnection(name = "redis")
+    GenericContainer<?> redis() {
+        return new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
     }
 }
