@@ -15,6 +15,6 @@ public class ActivityMapper {
     public ActivityDetail toDetail(Activity a) {
         return new ActivityDetail(a.getId(), a.getHostId(), a.getTitle(), a.getCategory(), a.getDescription(),
                 a.getLatitude(), a.getLongitude(), a.getStartsAt(), a.endsAt(),
-                a.getCapacity(), a.getSeatsTaken(), a.seatsLeft(), a.getStatus(), a.getCreatedAt());
+                a.getCapacity(), a.getSeatsTaken(), a.seatsLeft(), a.getStatus(), a.getMinReliability(), a.getCreatedAt());
     }
 }

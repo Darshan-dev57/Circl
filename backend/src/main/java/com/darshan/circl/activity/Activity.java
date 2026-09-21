@@ -59,6 +59,15 @@ public class Activity {
     @Column(nullable = false, length = 16)
     private ActivityStatus status = ActivityStatus.OPEN;
 
+    @Column(name = "min_reliability", nullable = false)
+    private int minReliability;
+
+    @Column(name = "attendance_finalized", nullable = false)
+    private boolean attendanceFinalized;
+
+    @Column(name = "attendance_unreliable", nullable = false)
+    private boolean attendanceUnreliable;
+
     @Version
     private long version;
 
@@ -138,4 +147,10 @@ public class Activity {
     public void setDurationMinutes(int durationMinutes) { this.durationMinutes = durationMinutes; }
     public void setCapacity(int capacity) { this.capacity = capacity; }
     public void setSeatsTaken(int seatsTaken) { this.seatsTaken = seatsTaken; }
+    public int getMinReliability() { return minReliability; }
+    public void setMinReliability(int minReliability) { this.minReliability = minReliability; }
+    public boolean isAttendanceFinalized() { return attendanceFinalized; }
+    public void markAttendanceFinalized() { this.attendanceFinalized = true; }
+    public boolean isAttendanceUnreliable() { return attendanceUnreliable; }
+    public void markAttendanceUnreliable() { this.attendanceUnreliable = true; }
 }

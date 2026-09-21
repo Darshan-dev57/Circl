@@ -8,4 +8,5 @@ public interface ActivityGate {
     UUID getHostId();
     ActivityStatus getStatus();
     Instant getStartsAt();
+    int getMinReliability();
 }
