@@ -1,5 +1,7 @@
 # Local infrastructure for Circl. Start with: docker compose up -d
 # Values come from .env (copy .env.example). The defaults below are for local dev only.
+name: circl
+
 services:
   postgres:
     image: postgis/postgis:16-3.4

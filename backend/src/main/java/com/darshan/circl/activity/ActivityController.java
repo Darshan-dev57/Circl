@@ -68,7 +68,12 @@ public class ActivityController {
                                         @RequestParam(defaultValue = "3") @DecimalMin("0.1") @DecimalMax("50.0") double radiusKm,
                                         @RequestParam(required = false) Category category,
                                         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
-        return service.nearby(lat, lng, radiusKm, category, limit);
+        return service.nearby(round3(lat), round3(lng), radiusKm, category, limit);
+    }
+
+    /** ~110 m; nearby results are the same for everyone in that cell, which makes them cacheable */
+    private static double round3(double degrees) {
+        return Math.round(degrees * 1000) / 1000.0;
     }
 
     @GetMapping("/{id}")

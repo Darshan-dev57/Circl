@@ -8,6 +8,9 @@ import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.text.TextSanitizer;
+import com.darshan.circl.config.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +38,7 @@ public class ActivityService {
         this.clock = clock;
     }
 
+    @CacheEvict(cacheNames = CacheConfig.NEARBY, allEntries = true)
     @Transactional
     public ActivityDetail create(UUID hostId, CreateActivityRequest req) {
         Activity activity = new Activity(
@@ -67,6 +71,13 @@ public class ActivityService {
         return page.map(mapper::toSummary);
     }
 
+    /**
+     * Cached for 30 s per ~110 m cell (the point is rounded to 3 decimals before the query, so the
+     * cached answer is exactly the answer for that cell). seatsLeft in here is for display only;
+     * joining always goes to Postgres.
+     */
+    @Cacheable(cacheNames = CacheConfig.NEARBY, sync = true,
+            key = "T(String).format('%.3f:%.3f:%s:%s:%d', #lat, #lng, #radiusKm, #category, #limit)")
     @Transactional(readOnly = true)
     public List<ActivitySummary> nearby(double lat, double lng, double radiusKm, Category category, int limit) {
         return activities.findNearby(lat, lng, radiusKm * 1000, category == null ? null : category.name(),
@@ -78,6 +89,7 @@ public class ActivityService {
                 .toList();
     }
 
+    @CacheEvict(cacheNames = CacheConfig.NEARBY, allEntries = true)
     @Transactional
     public ActivityDetail update(UUID id, UUID userId, boolean admin, UpdateActivityRequest req) {
         Activity activity = activities.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Activity", id));
@@ -114,6 +126,7 @@ public class ActivityService {
         return mapper.toDetail(activity);
     }
 
+    @CacheEvict(cacheNames = CacheConfig.NEARBY, allEntries = true)
     @Transactional
     public void cancel(UUID id, UUID userId, boolean admin) {
         Activity activity = find(id);
