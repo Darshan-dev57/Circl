@@ -123,6 +123,7 @@ public class ActivityService {
             }
             boolean grew = req.capacity() > activity.getCapacity();
             activity.setCapacity(req.capacity());
+            outbox.append(id, "CapacityChanged", Map.of("activityId", id, "capacity", req.capacity()));
             if (grew) {
                 events.publishEvent(new ActivityCapacityIncreased(activity));
             }
