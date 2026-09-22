@@ -31,17 +31,19 @@ public class AuthService {
     private final PasswordEncoder passwords;
     private final TokenService tokens;
     private final JwtProperties props;
+    private final LoginAttempts attempts;
     private final Clock clock;
     /** compared against when the email does not exist, so both paths cost one BCrypt check */
     private final String dummyHash;
 
     public AuthService(UserRepository users, RefreshTokenRepository refreshTokens, PasswordEncoder passwords,
-                       TokenService tokens, JwtProperties props, Clock clock) {
+                       TokenService tokens, JwtProperties props, LoginAttempts attempts, Clock clock) {
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.passwords = passwords;
         this.tokens = tokens;
         this.props = props;
+        this.attempts = attempts;
         this.clock = clock;
         this.dummyHash = passwords.encode("not-a-real-password");
     }
@@ -67,12 +69,15 @@ public class AuthService {
     @Transactional
     public TokenResponse login(LoginRequest req) {
         String email = normalizeEmail(req.email());
+        attempts.checkAllowed(email);
         User user = users.findByEmail(email).orElse(null);
         String hash = user == null ? dummyHash : user.getPasswordHash();
         boolean ok = passwords.matches(req.password(), hash);
         if (user == null || !ok) {
+            attempts.recordFailure(email);
             throw new UnauthorizedException("Email or password is wrong");
         }
+        attempts.reset(email);
         return issueTokens(user);
     }
 
