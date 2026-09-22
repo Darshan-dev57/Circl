@@ -70,6 +70,19 @@ class AuthApiIT {
     }
 
     @Test
+    void sixthWrongPasswordIsBlockedEvenWithTheRightOne() throws Exception {
+        Users.TestUser u = Users.participant(mvc);
+        String wrong = "{\"email\":\"" + u.email() + "\",\"password\":\"nope-nope\"}";
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content(wrong))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + u.email() + "\",\"password\":\"correct-horse-1\"}"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void cannotSignUpAsAdmin() throws Exception {
         mvc.perform(post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email":"sneaky@test.dev","password":"s3cret-pass","name":"x","role":"ADMIN"}
