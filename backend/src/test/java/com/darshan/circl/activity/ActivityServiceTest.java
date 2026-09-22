@@ -4,6 +4,7 @@ import com.darshan.circl.activity.dto.UpdateActivityRequest;
 import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
+import com.darshan.circl.common.outbox.Outbox;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ class ActivityServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ActivityService(repo, new ActivityMapper(), event -> { }, Clock.systemUTC());
+        service = new ActivityService(repo, new ActivityMapper(), event -> { }, mock(Outbox.class), Clock.systemUTC());
     }
 
     @Test
