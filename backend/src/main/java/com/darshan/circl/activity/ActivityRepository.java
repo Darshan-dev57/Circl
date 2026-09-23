@@ -56,6 +56,8 @@ public interface ActivityRepository extends JpaRepository<Activity, UUID> {
                                        @Param("now") Instant now,
                                        @Param("limit") int limit);
 
+    List<Activity> findTop50ByHostIdAndStartsAtAfterOrderByStartsAt(UUID hostId, Instant after);
+
     Page<Activity> findByStatusAndStartsAtAfter(ActivityStatus status, Instant after, Pageable pageable);
 
     Page<Activity> findByStatusAndCategoryAndStartsAtAfter(ActivityStatus status, Category category,
