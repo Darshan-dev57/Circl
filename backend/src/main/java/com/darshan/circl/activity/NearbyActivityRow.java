@@ -8,6 +8,8 @@ public interface NearbyActivityRow {
     String getTitle();
     String getCategory();
     Instant getStartsAt();
+    double getLat();
+    double getLng();
     int getCapacity();
     int getSeatsTaken();
     double getDistanceM();
