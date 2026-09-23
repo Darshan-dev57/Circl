@@ -71,6 +71,8 @@ class NearbySearchIT {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].title").value("Cricket in Cubbon"))
                 .andExpect(jsonPath("$[0].distanceM", closeTo(0.0, 100.0))) // search point is rounded to ~110 m
+                .andExpect(jsonPath("$[0].lat", closeTo(LAT, 0.0001))) // the pin itself is exact
+                .andExpect(jsonPath("$[0].lng", closeTo(LNG, 0.0001)))
                 .andExpect(jsonPath("$[1].title").value("Coffee on Church St"))
                 .andExpect(jsonPath("$[1].distanceM", closeTo(1300.0, 150.0)));
     }

@@ -9,7 +9,7 @@ public class ActivityMapper {
 
     public ActivitySummary toSummary(Activity a) {
         return new ActivitySummary(a.getId(), a.getTitle(), a.getCategory(), a.getStartsAt(),
-                a.getCapacity(), a.seatsLeft(), null);
+                a.getLatitude(), a.getLongitude(), a.getCapacity(), a.seatsLeft(), null);
     }
 
     public ActivityDetail toDetail(Activity a) {
