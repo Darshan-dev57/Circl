@@ -1,4 +1,6 @@
-# Local infrastructure for Circl. Start with: docker compose up -d
+# Local infrastructure for Circl.
+#   docker compose up -d                 -> only Postgres and Redis (run the backend from your IDE)
+#   docker compose --profile app up -d   -> also builds and runs the backend
 # Values come from .env (copy .env.example). The defaults below are for local dev only.
 name: circl
 
@@ -32,6 +34,26 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  backend:
+    profiles: [app]
+    build: ./backend
+    container_name: circl-backend
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-circl}
+      DB_USER: ${POSTGRES_USER:-circl}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-circl}
+      REDIS_HOST: redis
+      # DEV ONLY fallbacks, put real secrets (32+ characters) in .env
+      CIRCL_JWT_SECRET: ${CIRCL_JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      CIRCL_CHECKIN_SECRET: ${CIRCL_CHECKIN_SECRET:-dev-only-checkin-secret-change-me-0123456789}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   pgdata:
