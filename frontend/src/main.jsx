@@ -9,6 +9,7 @@ import ActivityPage from './pages/ActivityPage'
 import AuthPage from './pages/AuthPage'
 import Bookings from './pages/Bookings'
 import Explore from './pages/Explore'
+import NewActivity from './pages/NewActivity'
 import './styles.css'
 
 createRoot(document.getElementById('root')).render(
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="login" element={<AuthPage mode="login" />} />
             <Route path="signup" element={<AuthPage mode="signup" />} />
             <Route path="bookings" element={<RequireUser><Bookings /></RequireUser>} />
+            <Route path="host/new" element={<RequireUser role="HOST"><NewActivity /></RequireUser>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
