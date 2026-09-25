@@ -217,10 +217,23 @@ class AttendanceFlowIT {
     void noPenaltyWhenCheckInWasDownThatDay() throws Exception {
         endedHoursAgo(3);
         finalizer.finalizeDue();
-        jdbc.update("UPDATE activities SET attendance_unreliable = true WHERE id = ?", activityId);
+        mvc.perform(post("/api/v1/activities/{id}/attendance/unreliable", activityId).header("Authorization", alice.bearer()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/activities/{id}/attendance/unreliable", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isNoContent());
         jdbc.update("UPDATE participants SET no_show_at = now() - interval '49 hours' WHERE id = ?", participantId(alice));
         reliability.applyDueScores();
         assertThat(score(alice)).isEqualTo(50);
+    }
+
+    @Test
+    void checkinCannotBeReportedBrokenBeforeTheStartOrAfterScoresAreFinal() throws Exception {
+        mvc.perform(post("/api/v1/activities/{id}/attendance/unreliable", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isUnprocessableEntity());
+        endedHoursAgo(51);
+        mvc.perform(post("/api/v1/activities/{id}/attendance/unreliable", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value("Scores for this activity are already final"));
     }
 
     @Test
