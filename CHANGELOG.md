@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+### Added
+- React + Vite + Leaflet frontend: map of nearby activities, activity page with a live seat ring, bookings, host view and a form to post activities.
+- Live seat counts over Server-Sent Events, fanned out to every instance through a Redis channel.
+- In-app notifications fed by the outbox, with retries, backoff and parking after 5 failures.
+- Reconfirm reminder two hours before the start.
+- "Free now" availability in Redis with a ~1 km grid, distance buckets and search limits.
+- Redis cache for nearby search (30 s per ~110 m cell).
+- My bookings with keyset paging, my status on an activity, and a list of activities I host.
+- Host can report that check-in was down, so nobody gets a no-show penalty.
+- Login limit: 5 wrong passwords block the email for 15 minutes.
+- Swagger UI, Dockerfiles and a compose profile that runs the whole app, Maven wrapper, demo data script, Postman collection, diagrams and screenshots.
+
+### Changed
+- The refresh token is also sent as an HttpOnly, SameSite=Strict cookie; the body still works for API clients.
+- Nearby results include the pin coordinates.
+- CI builds and lints the frontend.
+
 ## [0.2.0] - 2026-10-09
 ### Added
 - Join with friends (`partySize` 1-4) and a party-aware waitlist: a freed seat goes to the first party that fits and is held for 15 minutes.
@@ -24,6 +42,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Join engine with `Idempotency-Key`, three seat strategies (conditional update, pessimistic, optimistic) and a waitlist.
 - Concurrency tests: 60 parallel joins for 10 seats and 50 threads for the last seat per strategy.
 
-[Unreleased]: https://github.com/Darshan-dev57/Circl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Darshan-dev57/Circl/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Darshan-dev57/Circl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Darshan-dev57/Circl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Darshan-dev57/Circl/releases/tag/v0.1.0
