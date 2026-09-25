@@ -1,0 +1,18 @@
+stateDiagram-v2
+    [*] --> RSVP: join or claim
+    RSVP --> RECONFIRMED: "still coming?" (reminder 2 h before)
+    RSVP --> CANCELLED: leave before start
+    RECONFIRMED --> CANCELLED: leave before start
+    CANCELLED --> RSVP: join again
+    RSVP --> CHECKED_IN: scan host QR (30 min before to 15 min after)
+    RECONFIRMED --> CHECKED_IN: scan host QR
+    CHECKED_IN --> ATTENDED: finalizer, 2 h after end
+    RSVP --> NO_SHOW: finalizer, no check-in
+    RECONFIRMED --> NO_SHOW: finalizer, no check-in
+    NO_SHOW --> ATTENDED: host evidence (scan failed)
+    note right of NO_SHOW
+        user can appeal for 48 h.
+        Accepted: no penalty.
+        Rejected or no appeal: counts
+        against the reliability score.
+    end note
