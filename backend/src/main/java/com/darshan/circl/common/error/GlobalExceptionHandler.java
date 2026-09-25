@@ -3,7 +3,9 @@ package com.darshan.circl.common.error;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -53,9 +55,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return pd;
     }
 
-    @ExceptionHandler(RedisConnectionFailureException.class)
-    ProblemDetail handleRedisDown(RedisConnectionFailureException ex) {
-        log.warn("Redis unavailable: {}", ex.getMessage());
+    // a stopped Redis is a connection failure on a new connection, but a command timeout on an open one
+    @ExceptionHandler({RedisConnectionFailureException.class, QueryTimeoutException.class})
+    ProblemDetail handleStoreDown(DataAccessException ex) {
+        log.warn("Store unavailable: {}", ex.getMessage());
         ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
                 "This feature is temporarily unavailable");
         pd.setType(URI.create(TYPE_BASE + "unavailable"));
