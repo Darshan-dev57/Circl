@@ -75,6 +75,8 @@ export default function HostTools({ activity, seats, onChange }) {
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
+  const [reported, setReported] = useState(false)
+  const started = Date.now() >= new Date(activity.startsAt).getTime()
   const cancelled = (seats?.status ?? activity.status) === 'CANCELLED'
 
   // a new join shows up in the list without a page reload
@@ -90,6 +92,16 @@ export default function HostTools({ activity, seats, onChange }) {
       await api(`/activities/${activity.id}`, { method: 'PATCH', body: { capacity: Number(capacity) } })
       setSaved(true)
       onChange()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function reportCheckinDown() {
+    setError(null)
+    try {
+      await api(`/activities/${activity.id}/attendance/unreliable`, { method: 'POST' })
+      setReported(true)
     } catch (err) {
       setError(err.message)
     }
@@ -133,9 +145,24 @@ export default function HostTools({ activity, seats, onChange }) {
         )}
       </div>
 
-      {!cancelled && (
+      {started && !cancelled && (
+        <div className="host__block">
+          <h3>Check-in trouble?</h3>
+          {reported ? (
+            <p className="note note--good small" role="status">Noted. Nobody gets a no-show for this one.</p>
+          ) : (
+            <>
+              <p className="muted small">If the code would not load for people, report it and no one is marked as a no-show.</p>
+              <button className="button button--quiet button--small" onClick={reportCheckinDown}>Check-in was not working</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {!cancelled && <CheckinCode activityId={activity.id} />}
+
+      {!cancelled && !started && (
         <>
-          <CheckinCode activityId={activity.id} />
 
           <form className="host__block host__capacity" onSubmit={saveCapacity}>
             <h3>Seats</h3>
