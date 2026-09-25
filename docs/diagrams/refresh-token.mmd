@@ -1,0 +1,22 @@
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as AuthController
+    participant DB as refresh_tokens
+
+    B->>API: POST /auth/login (email, password)
+    API->>API: BCrypt check, 5 fails = 15 min block
+    API->>DB: store sha256(refresh), expires in 7 days
+    API-->>B: accessToken (JWT, 15 min) in JSON<br/>Set-Cookie circl_refresh (HttpOnly, SameSite=Strict, Path=/api/v1/auth)
+    B->>API: GET /me/activities, Authorization: Bearer access
+    Note over B,API: 15 minutes later
+    B->>API: GET /me/activities
+    API-->>B: 401 token expired
+    B->>API: POST /auth/refresh (cookie sent by the browser)
+    API->>DB: SELECT ... FOR UPDATE by hash, revoke old row, insert new
+    API-->>B: new access token + new refresh cookie
+    B->>API: retry GET /me/activities
+    Note over B,DB: a stolen OLD refresh token shows up later
+    B->>API: POST /auth/refresh (old token)
+    API->>DB: row is already revoked, so revoke ALL tokens of that user
+    API-->>B: 401, everyone has to log in again
