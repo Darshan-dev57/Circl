@@ -95,6 +95,16 @@ class AuthApiIT {
     }
 
     @Test
+    void passwordLongerThan72BytesIsRefusedNotA500() throws Exception {
+        // 30 Kannada letters are only 30 characters but 90 bytes, more than BCrypt can take
+        String password = "ಕ".repeat(30);
+        mvc.perform(post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"email":"kannada@test.dev","password":"%s","name":"Darshan"}
+                        """.formatted(password)))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     void meNeedsAToken() throws Exception {
         mvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me").header("Authorization", "Bearer not.a.jwt"))
