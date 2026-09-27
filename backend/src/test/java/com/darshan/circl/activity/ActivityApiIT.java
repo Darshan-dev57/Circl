@@ -131,4 +131,15 @@ class ActivityApiIT {
         mvc.perform(delete(location).header("Authorization", host.bearer())).andExpect(status().isNoContent());
         mvc.perform(get(location)).andExpect(jsonPath("$.status").value("CANCELLED"));
     }
+
+    @Test
+    void patchRejectsTitleOfOnlySpaces() throws Exception {
+        String location = mvc.perform(post("/api/v1/activities").header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body("Football", 10, "")))
+                .andReturn().getResponse().getHeader("Location");
+        mvc.perform(patch(location).header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("title"));
+        mvc.perform(get(location)).andExpect(jsonPath("$.title").value("Football"));
+    }
 }
