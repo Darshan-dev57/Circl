@@ -76,7 +76,9 @@ export default function HostTools({ activity, seats, onChange }) {
   const [error, setError] = useState(null)
   const [saved, setSaved] = useState(false)
   const [reported, setReported] = useState(false)
-  const started = Date.now() >= new Date(activity.startsAt).getTime()
+  // checked every 30 s so the "check-in is down" button shows up once the activity starts
+  const now = useNow(30000)
+  const started = now >= new Date(activity.startsAt).getTime()
   const cancelled = (seats?.status ?? activity.status) === 'CANCELLED'
 
   // a new join shows up in the list without a page reload
