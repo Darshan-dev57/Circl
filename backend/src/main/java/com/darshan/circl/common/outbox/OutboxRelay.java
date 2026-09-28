@@ -1,10 +1,11 @@
 package com.darshan.circl.common.outbox;
 
-import com.darshan.circl.activity.live.SeatStream;
-import com.darshan.circl.notification.EventNotifier;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -13,16 +14,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Polls the outbox and hands each event to the notifier. FOR UPDATE SKIP LOCKED lets several
- * app instances run this at once without picking the same rows. Each event is processed in its
- * own transaction; a failing event is retried later with a growing delay and parked after 5 attempts,
- * so it never blocks the events behind it.
+ * Polls the outbox and publishes each event to Kafka, keyed by activity id so one activity's events
+ * land on one partition in order. A row is marked published only after the broker acks it. If the
+ * broker is down the row stays, and is retried later with a growing delay (parked after 5 attempts).
+ *
+ * The app crashing between the ack and the commit means the event goes out twice, which is why
+ * the consumers are idempotent.
  */
 @Component
 public class OutboxRelay {
@@ -32,22 +36,24 @@ public class OutboxRelay {
 
     private final JdbcTemplate jdbc;
     private final OutboxRepository events;
-    private final EventNotifier notifier;
-    private final SeatStream seats;
+    private final KafkaTemplate<String, ActivityEvent> kafka;
+    private final String topic;
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    public OutboxRelay(JdbcTemplate jdbc, OutboxRepository events, EventNotifier notifier,
-                       SeatStream seats, PlatformTransactionManager txManager, Clock clock) {
+    public OutboxRelay(JdbcTemplate jdbc, OutboxRepository events, KafkaTemplate<String, ActivityEvent> kafka,
+                       @Value("${circl.events.topic}") String topic, PlatformTransactionManager txManager, Clock clock) {
         this.jdbc = jdbc;
         this.events = events;
-        this.notifier = notifier;
-        this.seats = seats;
+        this.kafka = kafka;
+        this.topic = topic;
         this.tx = new TransactionTemplate(txManager);
         this.clock = clock;
     }
 
+    // one relay at a time across instances, otherwise two of them could send one activity's events out of order
     @Scheduled(fixedDelayString = "${circl.outbox.poll:PT2S}")
+    @SchedulerLock(name = "outbox-relay", lockAtMostFor = "PT1M")
     public void run() {
         relayBatch(100);
     }
@@ -55,36 +61,31 @@ public class OutboxRelay {
     /** returns how many events were published */
     public int relayBatch(int limit) {
         int published = 0;
-        Set<UUID> seatsChanged = new LinkedHashSet<>();
         for (int i = 0; i < limit; i++) {
             UUID[] current = new UUID[1];
             try {
-                OutboxEvent done = tx.execute(status -> relayOne(current));
-                if (done == null) {
+                Boolean sent = tx.execute(status -> relayOne(current));
+                if (!Boolean.TRUE.equals(sent)) {
                     break;
                 }
                 published++;
-                if (SeatStream.SEAT_EVENTS.contains(done.getType())) {
-                    seatsChanged.add(done.getAggregateId());
-                }
             } catch (RuntimeException e) {
                 if (current[0] == null) {
                     // failed before picking an event (database trouble), try again on the next poll
                     log.warn("Outbox poll failed: {}", e.getMessage());
                     break;
                 }
-                // the event's transaction is rolled back by now, so its row lock is gone
-                log.warn("Outbox event {} failed: {}", current[0], e.getMessage());
+                log.warn("Outbox event {} not published: {}", current[0], e.getMessage());
                 recordFailure(current[0], e);
+                // the broker is probably down, so the rest would fail the same way
+                break;
             }
         }
-        // after the commits, so browsers never see a seat count that was rolled back
-        seats.publish(seatsChanged);
         return published;
     }
 
-    /** null = nothing left to do */
-    private OutboxEvent relayOne(UUID[] current) {
+    /** false = nothing left to do */
+    private boolean relayOne(UUID[] current) {
         List<UUID> next = jdbc.queryForList("""
                 SELECT id FROM outbox_events
                  WHERE published_at IS NULL AND failed_at IS NULL
@@ -94,13 +95,25 @@ public class OutboxRelay {
                    FOR UPDATE SKIP LOCKED
                 """, UUID.class, Timestamp.from(Instant.now(clock)));
         if (next.isEmpty()) {
-            return null;
+            return false;
         }
         current[0] = next.get(0);
         OutboxEvent event = events.findById(next.get(0)).orElseThrow();
-        notifier.handle(ActivityEvent.from(event));
+        send(event);
         event.markPublished(Instant.now(clock));
-        return event;
+        return true;
+    }
+
+    private void send(OutboxEvent event) {
+        try {
+            kafka.send(topic, event.getAggregateId().toString(), ActivityEvent.from(event)).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while publishing", e);
+        } catch (ExecutionException | TimeoutException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            throw new IllegalStateException("kafka send failed: " + cause.getMessage(), e);
+        }
     }
 
     private void recordFailure(UUID id, RuntimeException e) {

@@ -46,7 +46,7 @@ class SeatStreamIT {
 
     // the update travels through a redis channel, so give it a moment
     private static void waitFor(MockHttpServletResponse stream, String text) throws Exception {
-        for (int i = 0; i < 50 && !stream.getContentAsString().contains(text); i++) {
+        for (int i = 0; i < 100 && !stream.getContentAsString().contains(text); i++) {
             Thread.sleep(100);
         }
         assertThat(stream.getContentAsString()).contains(text);
