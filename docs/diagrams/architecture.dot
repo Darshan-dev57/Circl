@@ -13,14 +13,17 @@ digraph circl {
         services    [label="Services\njoin engine, waitlist offers,\nattendance, reliability"];
         data        [label="Spring Data JPA\n+ JdbcTemplate"];
         jobs        [label="Scheduled jobs (ShedLock)\noutbox relay, offer expiry,\nfinalizer, reminders"];
+        listeners   [label="Kafka listeners\nnotifications, live seats"];
         sse         [label="SeatStream\nSseEmitters"];
         security -> controllers -> services -> data;
         jobs -> services [style=dashed];
         {rank=same; services; jobs;}
-        {rank=same; data; sse;}
+        listeners -> sse [label="seat events"];
+        {rank=same; data; listeners; sse;}
     }
 
     pg    [label="PostgreSQL 16 + PostGIS\nactivities, participants, waitlist,\nledger, outbox, notifications", shape=cylinder];
+    kafka [label="Kafka (KRaft)\ncircl.activity-events\n3 partitions, key = activity id", shape=cylinder, fillcolor="#fbe9df", color="#c4410e"];
     redis [label="Redis 7\nnearby cache, free-now,\nrate limits, seat channel", shape=cylinder];
 
     browser -> proxy [label="JSON + Bearer"];
@@ -29,8 +32,11 @@ digraph circl {
     data -> pg;
     jobs -> pg [label="poll outbox\nSKIP LOCKED"];
     services -> redis [label="cache, limits"];
-    jobs -> redis [label="PUBLISH seats"];
+    jobs -> kafka [label="publish, wait for ack"];
+    kafka -> listeners [label="consume", style=dashed];
+    listeners -> data [label="notifications\n(idempotent)", style=dashed];
+    sse -> redis [label="PUBLISH seats"];
     redis -> sse [label="SUBSCRIBE", style=dashed];
 
-    {rank=same; pg; redis;}
+    {rank=same; pg; kafka; redis;}
 }
