@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- Login and other Redis-backed endpoints answer `503` instead of `500` when Redis stops responding.
+- Signing up with a password over 72 bytes (for example 30 Kannada letters) returns `422` instead of `500`.
+- Editing an activity with a title of only spaces is rejected with `400`.
+- Check-in and the check-in code are refused for a cancelled activity.
+- The host's "check-in was down" button appears once the activity starts, without a page reload.
+- The demo data script can be run twice without duplicating activities.
+- `backend/mvnw.cmd` no longer shows up as modified right after cloning.
+- The outbox relay stops the batch when the poll itself fails, instead of logging the same error up to 100 times.
+
+### Changed
+- README: Windows steps as plain PowerShell lines, more configuration variables, test count.
 
 ## [0.3.0] - 2026-10-09
 ### Added
