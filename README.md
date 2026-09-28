@@ -36,8 +36,17 @@ transactional outbox, idempotent consumers, and integration tests on real contai
 
 **Stack:** Java 21 · Spring Boot 3.5 · PostgreSQL 16 + PostGIS · Apache Kafka (KRaft) · Redis 7 · React 19 + Vite + Leaflet · Docker Compose · Testcontainers · GitHub Actions
 
+## Live demo
+
+- **App:** https://circl-production-5c12.up.railway.app
+- **API docs (Swagger UI):** https://circl-production-d526.up.railway.app/swagger-ui.html
+- **Demo host login:** `demo.host@circl.dev` / `circl-demo-pass`, or sign up with any email.
+
+Hosted on free tiers (Railway, Neon, Upstash, Aiven), so the first request after a quiet period can take a few seconds.
+
 ## Contents
 
+- [Live demo](#live-demo)
 - [Key features](#key-features)
 - [Screenshots](#screenshots)
 - [Architecture](#architecture)
