@@ -1,7 +1,7 @@
 <h1 align="center">Circl</h1>
 
 <p align="center">
-  Find small games, study groups and plans happening near you, and grab a seat before it fills.
+  <strong>A location-aware meetup platform: discover activities nearby and claim a seat, with a booking engine that never overbooks.</strong>
 </p>
 
 <p align="center">
@@ -9,48 +9,58 @@
   <img src="https://img.shields.io/badge/Java-21-007396" alt="Java 21">
   <img src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F" alt="Spring Boot 3.5">
   <img src="https://img.shields.io/badge/PostgreSQL-16%20%2B%20PostGIS-336791" alt="PostgreSQL 16 + PostGIS">
+  <img src="https://img.shields.io/badge/Apache%20Kafka-3.9-231F20" alt="Apache Kafka 3.9">
+  <img src="https://img.shields.io/badge/Redis-7-DC382D" alt="Redis 7">
   <img src="https://img.shields.io/badge/React-19-61DAFB" alt="React 19">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
 ![Circl: activities on a map with seats left](docs/images/screens/explore-desktop.png)
 
-Someone posts "badminton doubles at 6:30, 4 people". People nearby see it on a map and join.
-The interesting part is the last seat: when 50 people tap **Join** at the same moment, exactly
-the right number get in, nobody is double booked, and the rest go to a fair waitlist.
+## Overview
+
+Circl lets people post small, time-boxed activities (a badminton doubles game at 6:30, a study group,
+a weekend trek) with a place, a start time and a fixed number of seats. Others find them on a map,
+sorted by distance, and join with one tap.
+
+The core engineering problem is contention for the last seat. When many users request the same seat at
+the same instant, Circl admits exactly as many as there is capacity, never double-books, and places
+everyone else on a fair waitlist with a time-boxed claim. Domain events (joins, cancellations, offers)
+are published reliably through a transactional outbox to Apache Kafka and consumed idempotently.
+
+**Stack:** Java 21 · Spring Boot 3.5 · PostgreSQL 16 + PostGIS · Apache Kafka (KRaft) · Redis 7 · React 19 + Vite + Leaflet · Docker Compose · Testcontainers · GitHub Actions
 
 ## Contents
 
-- [Features](#features)
+- [Key features](#key-features)
+- [Screenshots](#screenshots)
 - [Architecture](#architecture)
-- [Data model](#data-model)
-- [How the join engine works](#how-the-join-engine-works)
-- [Waitlist offers](#waitlist-offers)
-- [Login and refresh tokens](#login-and-refresh-tokens)
-- [Attendance and reliability](#attendance-and-reliability)
-- [Live seat count](#live-seat-count)
-- [Measured numbers](#measured-numbers)
-- [Tech choices](#tech-choices)
-- [Run it locally](#run-it-locally)
-- [API](#api)
-- [Tests](#tests)
+- [Engineering highlights](#engineering-highlights)
+- [Performance](#performance)
+- [Tech stack and rationale](#tech-stack-and-rationale)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [API reference](#api-reference)
+- [Testing](#testing)
 - [Project structure](#project-structure)
 - [Roadmap](#roadmap)
 
-## Features
+## Key features
 
-- **Nearby search** with PostGIS: activities within a radius, sorted by distance, filtered by category.
-- **Join engine** that never overbooks: one conditional `UPDATE` per join, `Idempotency-Key` so retries are safe, and a database `CHECK` as the last line of defence.
-- **Groups**: join with up to 3 friends (`partySize` 1 to 4). The whole group gets in or waits together.
-- **Waitlist with a 15 minute claim**: a freed seat is held for the first party that fits. Claim it or it moves on.
-- **Capacity ledger**: every seat change is an append-only row, so `SUM(delta)` always equals `seats_taken`.
-- **Attendance**: rotating QR check-in, a state machine, no-show appeals with a 48 hour window and host decisions.
-- **Reliability score** per user, and hosts can ask for a minimum score to join.
-- **Free now**: "free for an hour, up for cricket". Stored only in Redis with a TTL, location snapped to about 1 km, and searches are rate limited so nobody can triangulate you.
-- **Notifications** through a transactional outbox, with retries and backoff.
-- **Live seat count** in the browser with Server-Sent Events.
-- **Auth**: BCrypt, short JWT access tokens, rotating refresh tokens in an HttpOnly cookie with reuse detection, a login limit, and host-only edits.
-- **Frontend**: React + Vite + Leaflet, with a map, an activity page, bookings and a host view.
+| Area | Capability |
+|---|---|
+| Discovery | Radius search with PostGIS (`ST_DWithin` + GiST index, KNN ordering by distance), category filters, Redis-cached results |
+| Booking | Overbooking-proof joins via a single conditional `UPDATE`, `Idempotency-Key` support, group bookings of up to 4 that succeed or wait together |
+| Waitlist | Freed seats are held for the first party that fits, with a 15-minute claim window before moving on |
+| Auditability | Append-only capacity ledger: `SUM(delta)` always equals `seats_taken` |
+| Attendance | Rotating HMAC-signed QR check-in, an attendance state machine, no-show appeals within 48 hours |
+| Trust | Per-user reliability score with an optional minimum score per activity |
+| Presence | "Free now" status stored only in Redis with a TTL, location coarsened to about 1 km, rate-limited lookups |
+| Events | Transactional outbox published to Kafka; idempotent consumers for notifications and live seat counts, dead-letter topic for poison messages |
+| Real time | Live seat counts in the browser over Server-Sent Events |
+| Security | BCrypt, 15-minute JWT access tokens, rotating refresh tokens in an `HttpOnly` cookie with reuse detection, login throttling, ownership checks |
+
+## Screenshots
 
 <table>
   <tr>
@@ -58,8 +68,16 @@ the right number get in, nobody is double booked, and the rest go to a fair wait
     <td><img src="docs/images/screens/host-view.png" alt="Host view with participants and check-in"></td>
   </tr>
   <tr>
-    <td align="center">Activity page: each dot is a seat, yours are orange, updates live</td>
-    <td align="center">Host view: who is coming, rotating check-in QR, capacity</td>
+    <td align="center">Activity page: one dot per seat, updated live</td>
+    <td align="center">Host view: participants, rotating check-in QR, capacity</td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/screens/activity-offer.png" alt="Waitlist offer with a claim deadline"></td>
+    <td><img src="docs/images/screens/bookings.png" alt="My bookings"></td>
+  </tr>
+  <tr>
+    <td align="center">Waitlist offer with its claim deadline</td>
+    <td align="center">Upcoming and past bookings</td>
   </tr>
 </table>
 
@@ -67,37 +85,24 @@ the right number get in, nobody is double booked, and the rest go to a fair wait
 
 ![Architecture](docs/images/architecture.png)
 
-A plain layered Spring Boot app (controller, service, repository) with two stores:
+Circl is a modular monolith: one Spring Boot application organised by domain (`activity`, `participation`,
+`attendance`, `identity`, `notification`, ...), each with the usual controller, service and repository layers.
+Each backing service has a single, clearly bounded responsibility:
 
-- **PostgreSQL + PostGIS** is the source of truth for everything that matters: seats, participants, the waitlist, the ledger and the outbox.
-- **Redis** holds only things that are fine to lose: the nearby cache, free-now posts, rate-limit counters and the pub/sub channel for live seats. If Redis is down, nearby search still works (it goes straight to Postgres) and login fails closed with a `503`.
+- **PostgreSQL + PostGIS** is the system of record: activities, seats, participants, the waitlist, the capacity ledger and the outbox. Invariants that must never break are enforced as database constraints.
+- **Apache Kafka** carries domain events from the outbox to their consumers. It runs as a single KRaft node (no ZooKeeper) in Docker Compose and in tests.
+- **Redis** holds data that is safe to lose: the nearby-search cache, free-now posts, rate-limit counters and the pub/sub channel that fans live seat counts out to every app instance. If Redis is unavailable, nearby search falls back to PostgreSQL and login fails closed with `503`.
 
-Background work runs as `@Scheduled` jobs. ShedLock makes sure only one instance runs the offer-expiry,
-finalizer and reminder jobs at a time; the outbox relay uses `FOR UPDATE SKIP LOCKED` so several
-instances can share it without picking the same rows. No message broker is needed at this size.
+Background work runs as `@Scheduled` jobs (outbox relay, offer expiry, attendance finalizer, reconfirm reminders),
+coordinated across instances with ShedLock.
 
-## Data model
+## Engineering highlights
 
-![ER diagram](docs/images/er.png)
-
-Rules the database itself enforces:
-
-| Rule | How |
-|---|---|
-| Never more seats taken than capacity | `CHECK (seats_taken >= 0 AND seats_taken <= capacity)` |
-| A user joins an activity once | `UNIQUE (activity_id, user_id)` on participants and waitlist |
-| A retried request does the work once | primary key `(user_id, idem_key)` on `idempotency_keys` |
-| One notification per event per user | `UNIQUE (event_id, user_id)` |
-| One appeal per no-show | `UNIQUE (participant_id)` on `no_show_appeals` |
-| Location and lat/lng never disagree | `location` is a generated column from `latitude`, `longitude` |
-
-Schema changes are Flyway migrations (`V1` to `V7`), and Hibernate only validates the schema.
-
-## How the join engine works
+### Overbooking-proof join engine
 
 ![Join race](docs/images/join-race.png)
 
-The whole seat check is one statement:
+The seat check and the seat reservation are a single atomic statement:
 
 ```sql
 UPDATE activities
@@ -106,102 +111,127 @@ UPDATE activities
    AND seats_taken + :party <= capacity;
 ```
 
-Postgres locks the row for the first `UPDATE`; the second one waits, then re-checks the `WHERE`
-against the new row. So one request gets `1 row updated` and joins, the other gets `0` and goes to the
-waitlist. There is no "read seats, then write" gap for a race to slip into.
+PostgreSQL row-locks the activity for the first `UPDATE`; a concurrent one waits, then re-evaluates the
+`WHERE` clause against the committed row. One request updates a row and is admitted, the other updates
+none and is waitlisted. There is no read-then-write window for a race to exploit, and a
+`CHECK (seats_taken <= capacity)` constraint backs it up.
 
-The same code also has a pessimistic version (`SELECT ... FOR UPDATE`) and an optimistic one
-(`@Version` with retries), switchable with `CIRCL_JOIN_STRATEGY`, so they can be compared under the same test.
+- **Idempotency:** the `Idempotency-Key` row is written in the same transaction. A retry returns the stored response, a reused key with a different body is rejected, and a key still in flight returns `409`.
+- **Strategy comparison:** pessimistic (`SELECT ... FOR UPDATE`) and optimistic (`@Version` with retries) implementations sit behind `CIRCL_JOIN_STRATEGY` and are exercised by the same race tests.
+- **Seat simulator:** the [`seat-simulator`](seat-simulator) module reproduces the race in plain Java (`ExecutorService` + `CountDownLatch`). Without a lock, 100 threads booked 35 of 10 seats in one run; `synchronized`, `AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10. Run it with `java -cp seat-simulator/target/classes com.darshan.circl.sim.SeatSimulator` after a build.
 
-Before any of that, the `Idempotency-Key` row is inserted in the same transaction. A retry with the same
-key gets the saved response; the same key with a different body is rejected; a key still in flight
-gets `409`.
+### Reliable events: transactional outbox and Kafka
 
-The [`seat-simulator`](seat-simulator) module shows the same race in plain Java first
-(`ExecutorService` + `CountDownLatch`): in one run with no lock, 100 threads booked **35** of 10 seats (the exact number
-changes every run); `synchronized`, `AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10.
-After a build you can run it yourself: `java -cp seat-simulator/target/classes com.darshan.circl.sim.SeatSimulator`.
+![Outbox to Kafka flow](docs/images/outbox-kafka.png)
 
-## Waitlist offers
+Writing to the database and publishing to a broker in the same request is a dual write: if either side fails,
+the two disagree (a seat is taken but nobody is told, or a notification goes out for a rolled-back join).
+Circl avoids this with the transactional outbox pattern:
+
+1. The business change and an `outbox_events` row commit in **one database transaction**.
+2. `OutboxRelay` polls pending rows every 2 seconds (`FOR UPDATE SKIP LOCKED`, one relay at a time via ShedLock) and publishes each to the `circl.activity-events` topic, **keyed by activity id**, so all events for one activity land on one partition in order.
+3. A row is marked published **only after the broker acknowledges** it (`acks=all`). If Kafka is down, the row stays in the outbox and is retried with backoff (5 s, 10 s, ...) and parked after 5 attempts.
+4. Two consumer groups read the topic independently: `circl-notifications` writes in-app notifications, `circl-live-seats` pushes fresh seat counts to browsers.
+
+Delivery is **at least once**: a crash between the broker ack and the database commit republishes an event.
+Consumers are therefore idempotent. Notifications are inserted with `ON CONFLICT (event_id, user_id) DO NOTHING`,
+and a repeated seat event just re-sends the current count. A record that keeps failing is retried three times
+and then moved to `circl.activity-events-dlt`, so it cannot block its partition.
+
+### Waitlist with time-boxed offers
 
 ![Waitlist claim](docs/images/waitlist-claim.png)
 
-When seats free up, the first waiting party that fits gets an offer and the seats are held for 15 minutes.
-A party of 3 that does not fit keeps its place, and a party of 1 behind it can take the single seat.
-Claim and expiry both run `UPDATE ... WHERE status = 'OFFERED'`, so whichever comes first wins and the
-other changes nothing.
+When seats free up, the first waiting party that fits receives an offer and the seats are held for 15 minutes.
+A party of three that does not fit keeps its position, while a single person behind it can take one free seat.
+Claim and expiry both run `UPDATE ... WHERE status = 'OFFERED'`, so whichever arrives first wins and the other is a no-op.
 
-## Login and refresh tokens
+### Authentication and token rotation
 
 ![Refresh token flow](docs/images/refresh-token.png)
 
-- Access token: a JWT (HS256) that lives 15 minutes and is only kept in memory in the browser.
-- Refresh token: random, 7 days, stored as a SHA-256 hash, sent to the browser as an `HttpOnly`, `SameSite=Strict` cookie limited to `/api/v1/auth`. API clients can still send it in the body.
-- Every refresh rotates the token. If an old one is used again, someone copied it, so every token of that user is revoked.
-- Five wrong passwords block the email for 15 minutes (counted in Redis).
+- **Access token:** HS256 JWT, valid for 15 minutes, held only in memory by the browser.
+- **Refresh token:** random, valid for 7 days, stored as a SHA-256 hash and delivered as an `HttpOnly`, `SameSite=Strict` cookie scoped to `/api/v1/auth`. API clients may send it in the request body instead.
+- **Rotation with reuse detection:** every refresh issues a new token. Presenting a token that was already rotated revokes all of the user's sessions.
+- **Throttling:** five failed logins block the email for 15 minutes (counted in Redis).
 
-## Attendance and reliability
+### Attendance and reliability
 
 ![Attendance states](docs/images/attendance.png)
 
-The host shows a QR code that changes every 60 seconds (an HMAC-signed token). Scanning it with a phone
-camera opens the activity with the code filled in. Two hours after the end a finalizer marks everyone
-who did not check in as `NO_SHOW`. The user then has 48 hours to appeal; only a rejected or missing
-appeal counts against them.
+The host displays a QR code that rotates every 60 seconds (an HMAC-signed token). Two hours after an activity ends,
+a finalizer marks everyone who did not check in as `NO_SHOW`; the participant then has 48 hours to appeal,
+and only a rejected or missing appeal counts against them. Hosts can mark check-in as unreliable for an
+activity, in which case nobody is penalised.
 
 ```
 score = (checked_in + 1) / (committed + 2) * 100
 ```
 
-The `+1 / +2` (Laplace smoothing) means a new user starts at 50 and one bad day does not sink them.
-If check-in itself was broken that day, the host reports it
-(`POST /activities/{id}/attendance/unreliable`) and nobody on that activity is penalised.
+Laplace smoothing starts new users at 50 and keeps a single missed event from dominating the score.
 
-## Live seat count
+### Live seat count
 
 ![Live seats](docs/images/live-seats.png)
 
-The activity page opens an `EventSource` to `/api/v1/activities/{id}/seats`. After a join commits,
-the outbox relay reads the fresh numbers and publishes them on a Redis channel; every app instance
-forwards them to the browsers connected to it. Seats in the browser update about 1.5 seconds after a join,
-and a heartbeat every 25 seconds keeps proxies from closing the stream.
+The activity page subscribes to `/api/v1/activities/{id}/seats` with `EventSource`. The `circl-live-seats`
+consumer reads the committed seat numbers and publishes them on a Redis channel; every app instance forwards
+them to its connected browsers. A 25-second heartbeat keeps proxies from closing idle streams.
 
-## Measured numbers
+### Data model
 
-All measured on one 4 CPU machine (app, database and load generator together), so they are
-relative numbers, not production promises.
+![ER diagram](docs/images/er.png)
 
-| What | Result |
+| Invariant | Enforcement |
 |---|---|
-| Nearby search, 100k activities, 3 km | 72 to 85 ms without an index, about **8 ms** with a GiST index and KNN ordering |
-| Nearby search under load (k6, 50 users, 30 s) | without cache: p95 363 ms, 294 req/s. With Redis cache: **p95 34 ms, 3014 req/s**, 0 errors |
-| 60 people join 10 seats at once (HTTP) | **10 joined, 50 waitlisted, 0 overbooked** |
-| 50 threads for the last seat, 20 rounds, per strategy | conditional update p50 85 ms / pessimistic 96 ms / optimistic 57 ms with 143 retries, **0 overbooked** in all three |
-| 10 parallel requests with one `Idempotency-Key` | 1 participant row, 1 seat taken |
-| Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (one run, it changes every run) |
-| Join to live seat update in the browser | about 1.5 s |
+| Seats taken never exceed capacity | `CHECK (seats_taken >= 0 AND seats_taken <= capacity)` |
+| A user joins an activity at most once | `UNIQUE (activity_id, user_id)` on participants and waitlist |
+| A retried request takes effect once | primary key `(user_id, idem_key)` on `idempotency_keys` |
+| One notification per event per user | `UNIQUE (event_id, user_id)`, also what makes the Kafka consumer idempotent |
+| One appeal per no-show | `UNIQUE (participant_id)` on `no_show_appeals` |
+| Coordinates and geography always agree | `location` is a generated column from `latitude` and `longitude` |
 
-## Tech choices
+The schema is managed by Flyway migrations (`V1` to `V7`); Hibernate only validates it.
 
-| Need | Choice | Why | Not chosen |
+## Performance
+
+Measured on a single 4-CPU machine running the application, database and load generator together.
+Treat these as relative comparisons rather than production figures.
+
+| Scenario | Result |
+|---|---|
+| Nearby search, 100k activities, 3 km radius | 72 to 85 ms without an index; about **8 ms** with a GiST index and KNN ordering |
+| Nearby search under load (k6, 50 virtual users, 30 s) | uncached: p95 363 ms, 294 req/s; Redis-cached: **p95 34 ms, 3014 req/s**, 0 errors |
+| 60 concurrent HTTP joins for 10 seats | **10 joined, 50 waitlisted, 0 overbooked** |
+| 50 threads racing for the last seat, 20 rounds per strategy | conditional update p50 85 ms, pessimistic 96 ms, optimistic 57 ms with 143 retries; **0 overbooked** in all three |
+| 10 parallel requests sharing one `Idempotency-Key` | 1 participant row, 1 seat taken |
+| Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (varies per run) |
+| Join to live seat update in the browser (through Kafka and nginx) | 1.1 to 1.8 s, median 1.2 s over 7 joins; most of it is the 2 s outbox poll |
+| Kafka stopped during a leave, then restarted | the event stayed in the outbox and was delivered 6 s after the broker came back |
+
+## Tech stack and rationale
+
+| Concern | Choice | Rationale | Alternative considered |
 |---|---|---|---|
-| Language and framework | Java 21, Spring Boot 3.5 | the standard, records, virtual-thread ready | Node: weaker typing for a domain with rules |
-| Database | PostgreSQL 16 + PostGIS | transactions, row locks, `CHECK`s, real geo indexes | MongoDB: no multi-row transactions I would trust for seats |
-| Seat safety | conditional `UPDATE` | one round trip, no retry loop, the DB re-checks | `synchronized`: only works in one JVM |
-| Geo search | `ST_DWithin` + GiST + `<->` | uses the index, sorts by real distance | Haversine in SQL: full table scan |
-| Cache, free-now, limits | Redis | TTLs, GEO commands, atomic counters | in-memory map: breaks with two instances |
-| Events | transactional outbox + scheduled relay | no lost or ghost events, no extra infra | Kafka or RabbitMQ: more to run than this app needs |
-| Live seats | Server-Sent Events | one-way updates over plain HTTP, auto-reconnect | WebSocket: two-way is not needed; polling: wasteful |
-| Auth | JWT access + rotating refresh | stateless API, refresh can be revoked | server sessions: sticky sessions or a session store |
-| Tests | JUnit 5, Testcontainers | real Postgres + PostGIS + Redis in tests | H2: no PostGIS, different locking |
-| Frontend | React + Vite + Leaflet | small, fast to build, free map tiles | Next.js: server rendering is not needed here |
+| Language and framework | Java 21, Spring Boot 3.5 | mature ecosystem, records, strong typing for rule-heavy domain code | Node.js: weaker typing for this domain |
+| Database | PostgreSQL 16 + PostGIS | transactions, row locks, `CHECK` constraints, real spatial indexes | MongoDB: multi-document transactions are a poor fit for seat accounting |
+| Seat safety | conditional `UPDATE` | one round trip, no retry loop, the database re-checks the condition | `synchronized`: only protects a single JVM |
+| Geo search | `ST_DWithin` + GiST + `<->` | index-backed, ordered by true distance | Haversine in SQL: full table scan |
+| Events | transactional outbox + Apache Kafka | no lost or phantom events, ordered per activity, independent consumer groups, replayable | direct publish from the request: dual write; RabbitMQ: classic queues drop messages once consumed, so no replay or per-key partition ordering |
+| Cache, presence, limits | Redis | TTLs, GEO commands, atomic counters | in-process maps: break with more than one instance |
+| Live updates | Server-Sent Events | one-way push over plain HTTP with automatic reconnect | WebSocket: bidirectional channel not needed; polling: wasteful |
+| Auth | JWT access + rotating refresh tokens | stateless API with revocable sessions | server sessions: need sticky sessions or a session store |
+| Testing | JUnit 5 + Testcontainers | real PostgreSQL/PostGIS, Redis and Kafka in every integration test | H2 / embedded brokers: different SQL, locking and delivery behaviour |
+| Frontend | React + Vite + Leaflet | lightweight SPA, fast builds, free map tiles | Next.js: server rendering not required |
 
-## Run it locally
+## Getting started
 
-You need **Docker** (Docker Desktop on Windows or Mac). For development without Docker for the app,
-also **JDK 21** and **Node 22**.
+### Prerequisites
 
-### Everything in Docker
+- **Docker** (Docker Desktop on Windows and macOS). This is all you need to run the full stack.
+- For development mode and running tests: **JDK 21** and **Node.js 22**.
+
+### Quick start (Docker)
 
 ```bash
 git clone https://github.com/Darshan-dev57/Circl.git
@@ -209,28 +239,35 @@ cd Circl
 docker compose --profile app up -d --build
 ```
 
-Open http://localhost:3000. The API is on http://localhost:8080 and Swagger UI on
-http://localhost:8080/swagger-ui.html.
+| Service | URL |
+|---|---|
+| Web app | http://localhost:3000 |
+| REST API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Kafka (from the host) | `localhost:9092` |
 
-Load some demo activities around Koramangala:
+Load demo activities around Koramangala, Bengaluru:
 
 ```bash
 docker exec -i circl-postgres psql -U circl -d circl < scripts/demo_data.sql
 ```
 
-Log in as the demo host `demo.host@circl.dev` / `circl-demo-pass`, or sign up as yourself.
+Sign in as the demo host `demo.host@circl.dev` / `circl-demo-pass`, or create an account.
+
+> [!NOTE]
+> The first build downloads the base images and dependencies and takes a few minutes (about 2 minutes on the test machine). The backend waits for PostgreSQL, Redis and Kafka to report healthy before it starts.
 
 ### Development mode
 
 ```bash
-docker compose up -d                        # only Postgres and Redis
+docker compose up -d                        # PostgreSQL, Redis and Kafka only
 ./mvnw -pl backend spring-boot:run          # API on :8080
-cd frontend && npm install && npm run dev   # app on :5173, /api is proxied to :8080
+cd frontend && npm install && npm run dev   # app on :5173, /api proxied to :8080
 ```
 
-### On Windows (PowerShell)
+### Windows (PowerShell)
 
-Start Docker Desktop first (WSL 2 backend) and wait until it shows "Engine running". Then run these one line at a time:
+Start Docker Desktop (WSL 2 backend) and wait for "Engine running". Run each line separately:
 
 ```powershell
 git clone https://github.com/Darshan-dev57/Circl.git
@@ -252,38 +289,46 @@ npm install
 npm run dev
 ```
 
-Tests: `.\mvnw.cmd verify` (Docker Desktop must be running, the integration tests start their own containers).
+Run the tests with `.\mvnw.cmd verify` while Docker Desktop is running.
 
-- PowerShell has no `<` redirect, which is why the SQL file is piped in with `Get-Content`.
-- Windows PowerShell 5.1 does not understand `&&`, so run the commands as separate lines like above.
-- `mvnw.cmd` needs JDK 21: `java -version` should say 21. If Maven picks another JDK, set `JAVA_HOME` to the JDK 21 folder.
-- If port 5432, 6379, 8080 or 3000 is already taken (often a local PostgreSQL service on 5432), stop that service or change the left side of the port in `docker-compose.yml`, e.g. `"5433:5432"`. For development mode then also set `$env:DB_URL="jdbc:postgresql://localhost:5433/circl"` before starting the backend.
-- Line endings: `.gitattributes` keeps `mvnw` LF and `mvnw.cmd` CRLF, so the default Git for Windows settings work.
+> [!TIP]
+> - PowerShell has no `<` redirect, so the SQL file is piped in with `Get-Content`.
+> - Windows PowerShell 5.1 does not support `&&`; run commands on separate lines as shown.
+> - `mvnw.cmd` requires JDK 21 (`java -version`). If Maven picks up another JDK, point `JAVA_HOME` at JDK 21.
+> - If port 5432, 6379, 9092, 8080 or 3000 is taken (commonly a local PostgreSQL on 5432), stop that service or change the host side of the mapping in `docker-compose.yml`, for example `"5433:5432"`, and in development mode set `$env:DB_URL="jdbc:postgresql://localhost:5433/circl"`.
+> - `.gitattributes` keeps `mvnw` as LF and `mvnw.cmd` as CRLF, so default Git for Windows settings work.
 
-### Configuration
+## Configuration
 
-| Variable | Default | Notes |
+All settings are read from environment variables. For Docker Compose, copy `.env.example` to `.env`.
+
+| Variable | Default | Description |
 |---|---|---|
-| `DB_URL`, `DB_USER`, `DB_PASSWORD` | local compose values | |
-| `REDIS_HOST`, `REDIS_PORT` | `localhost`, `6379` | |
-| `CIRCL_JWT_SECRET` | dev-only value | set 32+ random characters anywhere real |
-| `CIRCL_CHECKIN_SECRET` | dev-only value | signs the check-in QR codes |
-| `COOKIE_SECURE` | `false` | set `true` behind HTTPS |
-| `CIRCL_JOIN_STRATEGY` | `CONDITIONAL_UPDATE` | or `PESSIMISTIC`, `OPTIMISTIC` |
-| `CACHE_TYPE` | `redis` | `none` turns the nearby cache off |
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | local Compose values | PostgreSQL connection |
+| `REDIS_HOST`, `REDIS_PORT` | `localhost`, `6379` | Redis connection |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka brokers (`kafka:19092` inside Compose) |
+| `CIRCL_JWT_SECRET` | development-only value | JWT signing key; use 32+ random characters outside local development |
+| `CIRCL_CHECKIN_SECRET` | development-only value | signs check-in QR codes |
+| `COOKIE_SECURE` | `false` | set to `true` when served over HTTPS |
+| `CIRCL_JOIN_STRATEGY` | `CONDITIONAL_UPDATE` | `PESSIMISTIC` or `OPTIMISTIC` for comparison |
+| `CACHE_TYPE` | `redis` | `none` disables the nearby-search cache |
 | `CORS_ORIGINS` | `http://localhost:5173` | browser origins allowed to call the API directly |
-| `PORT` | `8080` | |
+| `PORT` | `8080` | HTTP port |
 
-Copy `.env.example` to `.env` for Docker Compose. No real secret is committed.
+> [!IMPORTANT]
+> The defaults for `CIRCL_JWT_SECRET` and `CIRCL_CHECKIN_SECRET` are for local development only. No real secret is committed to this repository.
 
-## API
+## API reference
 
-Everything is under `/api/v1`. Errors are [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457)
-with a list of field errors for validation failures. A ready-made Postman collection is in
-[`docs/postman`](docs/postman/circl.postman_collection.json). Run it top to bottom; the offer,
-check-in and appeal requests only succeed when an activity is actually full, about to start or finished.
+All endpoints are under `/api/v1`. Errors follow [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457),
+including field-level errors for validation failures. Interactive documentation is served by Swagger UI, and a
+Postman collection is available in [`docs/postman`](docs/postman/circl.postman_collection.json); run it top to bottom
+(offer, check-in and appeal requests need an activity that is full, about to start or finished).
 
-| Method | Path | Who | What |
+<details>
+<summary>Endpoint list (34 endpoints)</summary>
+
+| Method | Path | Access | Description |
 |---|---|---|---|
 | POST | `/auth/signup` | anyone | create an account (role `PARTICIPANT` or `HOST`) |
 | POST | `/auth/login` | anyone | tokens + refresh cookie |
@@ -293,20 +338,20 @@ check-in and appeal requests only succeed when an activity is actually full, abo
 | POST | `/activities` | host | create an activity |
 | GET | `/activities` | anyone | upcoming activities, paged |
 | GET | `/activities/nearby?lat&lng&radiusKm&category` | anyone | nearby, sorted by distance |
-| GET | `/activities/{id}` | anyone | details |
-| PATCH | `/activities/{id}` | owner | edit title, time, capacity... |
-| DELETE | `/activities/{id}` | owner | cancel (everyone is notified) |
+| GET | `/activities/{id}` | anyone | activity details |
+| PATCH | `/activities/{id}` | owner | update title, time, capacity and other fields |
+| DELETE | `/activities/{id}` | owner | cancel; every participant is notified |
 | GET | `/activities/{id}/seats` | anyone | live seat count (Server-Sent Events) |
 | POST | `/activities/{id}/join` | user | join or get waitlisted, needs `Idempotency-Key` |
 | DELETE | `/activities/{id}/participants/me` | user | leave or leave the waitlist |
 | GET | `/activities/{id}/participants/me` | user | my status: joined, waitlisted (position), offered |
-| GET | `/activities/{id}/participants` | owner | who is coming |
+| GET | `/activities/{id}/participants` | owner | participant list |
 | GET | `/me/activities?when=upcoming\|past&cursor` | user | my bookings, keyset paged |
 | GET | `/me/hosting` | host | activities I host |
 | GET | `/me/offers` | user | open waitlist offers |
 | POST | `/waitlist/offers/{id}/claim` | user | claim held seats |
-| POST | `/waitlist/offers/{id}/decline` | user | pass them on |
-| POST | `/activities/{id}/confirm` | user | "still coming" |
+| POST | `/waitlist/offers/{id}/decline` | user | decline, passing the seats to the next party |
+| POST | `/activities/{id}/confirm` | user | reconfirm attendance |
 | GET | `/activities/{id}/checkin-code` | owner | current QR code (60 s) |
 | POST | `/activities/{id}/checkin` | user | check in with the code |
 | POST | `/activities/{id}/attendance/{userId}/evidence` | owner | fix a failed scan |
@@ -316,23 +361,27 @@ check-in and appeal requests only succeed when an activity is actually full, abo
 | GET | `/me/reliability` | user | score breakdown |
 | POST | `/availability` | user | free now, for 15 to 180 minutes |
 | GET | `/availability/nearby` | user | who is free nearby (rounded distance) |
-| DELETE | `/availability/me` | user | not free any more |
+| DELETE | `/availability/me` | user | clear free-now status |
 | GET | `/me/notifications` | user | latest notifications |
 | POST | `/me/notifications/{id}/read` | user | mark as read |
 
-## Tests
+</details>
+
+## Testing
 
 ```bash
-./mvnw verify      # unit tests + integration tests against real Postgres/PostGIS and Redis (needs Docker)
+./mvnw verify                                  # unit + integration tests (requires Docker)
 cd frontend && npm run lint && npm run build
 ```
 
-**130 tests**: 9 for the seat simulator, 32 unit tests and 89 integration tests that run against real PostgreSQL + PostGIS and Redis started by Testcontainers. No H2, because H2 has no PostGIS and locks rows differently.
+**133 tests:** 9 for the seat simulator, 32 unit tests and 92 integration tests. Integration tests run
+against real PostgreSQL + PostGIS, Redis and Kafka containers started by Testcontainers.
 
-What the integration tests cover, among other things: 60 parallel HTTP joins for 10 seats,
-50 threads for the last seat under each strategy, idempotent replays, waitlist offers racing with
-cancels, refresh token reuse, check-in windows, appeals, the free-now privacy rules, the outbox
-retry and parking, and the live seat stream. CI runs the same on every push.
+Coverage includes 60 parallel HTTP joins for 10 seats, last-seat races under each locking strategy, idempotent
+replays, waitlist offers racing with cancellations, refresh token reuse, check-in windows and appeals, free-now
+privacy rules, the outbox-to-Kafka round trip, duplicate delivery producing exactly one notification, broker
+outages leaving events in the outbox, dead-letter routing, and the live seat stream. GitHub Actions runs the full
+suite on every push.
 
 ## Project structure
 
@@ -346,9 +395,9 @@ Circl
 │       ├── reliability/         score
 │       ├── availability/        free now (Redis)
 │       ├── identity/            signup, login, JWT, refresh tokens
-│       ├── notification/        in-app notifications from outbox events
-│       ├── common/              errors, outbox, paging, request id
-│       └── config/              security, cache, scheduling, OpenAPI
+│       ├── notification/        in-app notifications (Kafka consumer)
+│       ├── common/              errors, outbox + Kafka relay, paging, request id
+│       └── config/              security, cache, scheduling, Kafka, OpenAPI
 ├── frontend/                    React + Vite + Leaflet
 ├── seat-simulator/              the race condition in plain Java
 ├── load/                        k6 script for nearby search
@@ -360,12 +409,12 @@ Circl
 
 ## Roadmap
 
-- Push notifications (web push) on top of the existing outbox events
-- Host screen to review appeals in the UI (the API is there)
-- Recurring activities ("every Sunday 7 am")
-- Chat inside an activity
-- Deploy with a managed Postgres and a public demo
+- Web push notifications as an additional Kafka consumer
+- Appeal review screen for hosts (the API exists)
+- Recurring activities, for example every Sunday at 7 am
+- Activity chat
+- Public deployment with managed PostgreSQL and Kafka
 
-## License
+---
 
-[MIT](LICENSE)
+Released under the [MIT License](LICENSE). See the [changelog](CHANGELOG.md) for release history.

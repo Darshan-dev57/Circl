@@ -3,6 +3,7 @@ sequenceDiagram
     participant U as Someone joins
     participant I1 as App instance 1
     participant DB as PostgreSQL
+    participant K as Kafka
     participant RD as Redis channel circl:seats
     participant I2 as App instance 2
     participant V as Viewer's browser
@@ -14,7 +15,9 @@ sequenceDiagram
     loop every 2 s
         I1->>DB: outbox relay picks the event
     end
-    I1->>DB: read fresh seat numbers (after commit)
+    I1->>K: publish ParticipantJoined (key = activity 42)
+    K-->>I1: live-seats consumer gets it
+    I1->>DB: read fresh seat numbers
     I1->>RD: PUBLISH {seatsTaken 7}
     RD-->>I1: message
     RD-->>I2: message
