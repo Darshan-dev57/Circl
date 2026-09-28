@@ -98,7 +98,7 @@ public class OutboxRelay {
         }
         current[0] = next.get(0);
         OutboxEvent event = events.findById(next.get(0)).orElseThrow();
-        notifier.handle(event);
+        notifier.handle(ActivityEvent.from(event));
         event.markPublished(Instant.now(clock));
         return event;
     }
