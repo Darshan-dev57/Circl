@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -116,15 +117,31 @@ class AttendanceFlowIT {
 
     @Test
     void checkInWindowAndCodeAreEnforced() throws Exception {
+        startsInMinutes(5);
+        String code = code();
         startsInMinutes(90);
-        checkIn(alice, code()).andExpect(status().isUnprocessableEntity()); // too early
+        checkIn(alice, code).andExpect(status().isUnprocessableEntity()); // too early
         startsInMinutes(-20);
-        checkIn(alice, code()).andExpect(status().isUnprocessableEntity()); // grace is over
+        checkIn(alice, code).andExpect(status().isUnprocessableEntity()); // grace is over
         startsInMinutes(5);
         checkIn(alice, "forged.code").andExpect(status().isUnprocessableEntity());
         checkIn(Users.participant(mvc), code()).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/activities/{id}/checkin-code", activityId).header("Authorization", alice.bearer()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void checkinCodeIsOnlyIssuedInsideTheWindow() throws Exception {
+        startsInMinutes(90);
+        mvc.perform(get("/api/v1/activities/{id}/checkin-code", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value(endsWith("checkin-not-open")));
+        startsInMinutes(-20);
+        mvc.perform(get("/api/v1/activities/{id}/checkin-code", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value(endsWith("checkin-closed")));
+        startsInMinutes(25);
+        code();
     }
 
     @Test

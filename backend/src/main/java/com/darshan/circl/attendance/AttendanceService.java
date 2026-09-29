@@ -72,6 +72,7 @@ public class AttendanceService {
         Activity activity = activity(activityId);
         requireHost(activity, hostId);
         requireOpen(activity);
+        requireCheckinWindow(activity, Instant.now(clock));
         return tokens.issue(activityId);
     }
 
@@ -83,12 +84,7 @@ public class AttendanceService {
         if (!tokens.isValid(code, activityId)) {
             throw new RuleViolationException("invalid-checkin-code", "Check-in code is invalid or expired");
         }
-        if (now.isBefore(activity.getStartsAt().minus(opensBefore))) {
-            throw new RuleViolationException("checkin-not-open", "Check-in opens " + opensBefore.toMinutes() + " minutes before the start");
-        }
-        if (now.isAfter(activity.getStartsAt().plus(grace))) {
-            throw new RuleViolationException("checkin-closed", "Check-in closed " + grace.toMinutes() + " minutes after the start");
-        }
+        requireCheckinWindow(activity, now);
         Participant p = participants.findByActivityIdAndUserId(activityId, userId)
                 .filter(Participant::isJoined)
                 .orElseThrow(() -> new ForbiddenException("Only participants of this activity can check in"));
@@ -159,6 +155,15 @@ public class AttendanceService {
     private static void requireHost(Activity activity, UUID userId) {
         if (!activity.isHostedBy(userId)) {
             throw new ForbiddenException("Only the host can do this");
+        }
+    }
+
+    private void requireCheckinWindow(Activity activity, Instant now) {
+        if (now.isBefore(activity.getStartsAt().minus(opensBefore))) {
+            throw new RuleViolationException("checkin-not-open", "Check-in opens " + opensBefore.toMinutes() + " minutes before the start");
+        }
+        if (now.isAfter(activity.getStartsAt().plus(grace))) {
+            throw new RuleViolationException("checkin-closed", "Check-in closed " + grace.toMinutes() + " minutes after the start");
         }
     }
 
