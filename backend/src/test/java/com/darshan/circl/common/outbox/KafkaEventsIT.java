@@ -17,6 +17,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.testcontainers.kafka.KafkaContainer;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Duration;
@@ -144,5 +145,68 @@ class KafkaEventsIT {
 
         List<ConsumerRecord<String, ActivityEvent>> dead = readAll(TOPIC + "-dlt", poison.eventId());
         assertThat(dead).anyMatch(r -> poison.eventId().equals(r.value().eventId()));
+    }
+
+    @Autowired
+    KafkaContainer broker;
+
+    /**
+     * A real outage: the broker container is frozen while people keep joining. The joins still
+     * succeed (they only write to Postgres), nothing is published while Kafka is gone, and once it is
+     * back every event goes out and turns into exactly one notification.
+     */
+    @Test
+    void eventsWrittenDuringAKafkaOutageAreAllDeliveredAfterwards() throws Exception {
+        holdScheduledRelay();
+        relay.relayBatch(500);
+        TestUser host = Users.host(mvc);
+        UUID activity = Activities.create(mvc, host, 10);
+        List<TestUser> guests = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            guests.add(Users.participant(mvc));
+        }
+
+        var docker = broker.getDockerClient();
+        docker.pauseContainerCmd(broker.getContainerId()).exec();
+        try {
+            for (TestUser guest : guests) {
+                join(guest, activity);
+            }
+            assertThat(relay.relayBatch(500)).isZero();
+            assertThat(unpublished(activity)).isEqualTo(5);
+        } finally {
+            docker.unpauseContainerCmd(broker.getContainerId()).exec();
+        }
+
+        // broker is back; skip the retry backoff instead of waiting for it
+        await().atMost(Duration.ofSeconds(60)).until(() -> {
+            jdbc.update("UPDATE outbox_events SET next_attempt_at = NULL WHERE aggregate_id = ? AND published_at IS NULL", activity);
+            relay.relayBatch(500);
+            return unpublished(activity) == 0;
+        });
+        await().atMost(Duration.ofSeconds(30)).until(() -> notificationsFor(host) == 5);
+        Thread.sleep(2000);
+        assertThat(notificationsFor(host)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM outbox_events WHERE aggregate_id = ? AND failed_at IS NOT NULL",
+                Integer.class, activity)).isZero();
+        jdbc.update("UPDATE shedlock SET lock_until = now() WHERE name = 'outbox-relay' AND locked_by = 'test'");
+    }
+
+    private int unpublished(UUID activity) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM outbox_events WHERE aggregate_id = ? AND type = 'ParticipantJoined' AND published_at IS NULL
+                """, Integer.class, activity);
+    }
+
+    // takes the scheduler's lock (the same way ShedLock does) so the background relay stays out of this test
+    private void holdScheduledRelay() {
+        jdbc.update("""
+                INSERT INTO shedlock (name, lock_until, locked_at, locked_by) VALUES ('outbox-relay', now(), now(), 'test')
+                ON CONFLICT (name) DO NOTHING
+                """);
+        await().atMost(Duration.ofSeconds(30)).until(() -> jdbc.update("""
+                UPDATE shedlock SET lock_until = now() + interval '2 minutes', locked_at = now(), locked_by = 'test'
+                 WHERE name = 'outbox-relay' AND lock_until <= now()
+                """) == 1);
     }
 }
