@@ -34,6 +34,8 @@ public class EventNotifier {
         switch (event.type()) {
             case "ParticipantJoined" -> toHost(event, activityId, "PARTICIPANT_JOINED",
                     nameOf(data.get("userId")) + " joined " + titleOf(activityId));
+            case "WaitlistClaimed" -> toHost(event, activityId, "PARTICIPANT_JOINED",
+                    nameOf(data.get("userId")) + " joined " + titleOf(activityId) + " from the waitlist");
             case "ParticipantLeft" -> toHost(event, activityId, "PARTICIPANT_LEFT",
                     nameOf(data.get("userId")) + " left " + titleOf(activityId));
             case "WaitlistOffered" -> {
