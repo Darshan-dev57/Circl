@@ -126,6 +126,14 @@ time {
   white-space: nowrap;
 }
 
+/* the category radios sit inside .field, whose input rule would make them full width again */
+.field .visually-hidden {
+  width: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
 /* top bar */
 
 .topbar {
@@ -291,6 +299,7 @@ time {
 }
 
 .chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
   height: 32px;
