@@ -58,6 +58,13 @@ class NotificationsIT {
                 .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isOk());
     }
 
+    private void join(TestUser u, UUID activity, int partySize) throws Exception {
+        mvc.perform(post("/api/v1/activities/{id}/join", activity).header("Authorization", u.bearer())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"partySize\":" + partySize + "}")).andExpect(status().isOk());
+    }
+
     @Autowired
     OutboxRepository outbox;
 
@@ -97,6 +104,25 @@ class NotificationsIT {
     }
 
     @Test
+    void hostHearsWhenSomeoneJoinsFromTheWaitlist() throws Exception {
+        TestUser host = Users.host(mvc);
+        TestUser a = Users.participant(mvc), b = Users.participant(mvc);
+        UUID activity = Activities.create(mvc, host, 2);
+        join(a, activity);
+        join(b, activity, 2); // waitlisted, a party of two does not fit
+        mvc.perform(delete("/api/v1/activities/{id}/participants/me", activity).header("Authorization", a.bearer()));
+        UUID offer = jdbc.queryForObject("SELECT id FROM waitlist WHERE activity_id = ? AND status = 'OFFERED'",
+                UUID.class, activity);
+        mvc.perform(post("/api/v1/waitlist/offers/{id}/claim", offer).header("Authorization", b.bearer()))
+                .andExpect(status().isOk());
+        drainOutbox();
+
+        eventually(() -> mvc.perform(get("/api/v1/me/notifications").header("Authorization", host.bearer()))
+                .andExpect(jsonPath("$[0].type").value("PARTICIPANT_JOINED"))
+                .andExpect(jsonPath("$[0].message").value(org.hamcrest.Matchers.endsWith("from the waitlist"))));
+    }
+
+    @Test
     void cancellingTellsEveryParticipant() throws Exception {
         TestUser host = Users.host(mvc);
         TestUser a = Users.participant(mvc);
@@ -120,7 +146,10 @@ class NotificationsIT {
         assertThat(reminders.sendDue()).isZero();
         drainOutbox();
         eventually(() -> mvc.perform(get("/api/v1/me/notifications").header("Authorization", a.bearer()))
-                .andExpect(jsonPath("$[0].type").value("RECONFIRM")));
+                .andExpect(jsonPath("$[0].type").value("RECONFIRM"))
+                .andExpect(jsonPath("$[0].message").value(org.hamcrest.Matchers.containsString(" starts at ")))
+                .andExpect(jsonPath("$[0].message").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("2 hours")))));
     }
 
     @Test
