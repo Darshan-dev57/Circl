@@ -10,7 +10,10 @@ import com.darshan.circl.support.Users;
 import com.darshan.circl.support.Users.TestUser;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import com.darshan.circl.support.KafkaReady;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,6 +43,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
 class NotificationsIT {
+
+    @Autowired
+    KafkaListenerEndpointRegistry listeners;
+
+    @BeforeEach
+    void consumersAreReady() {
+        KafkaReady.waitForConsumers(listeners);
+    }
+
 
     @Autowired
     MockMvc mvc;
@@ -77,7 +89,7 @@ class NotificationsIT {
 
     // the consumer runs on its own thread, so give it a moment
     private static void eventually(ThrowingRunnable check) {
-        await().atMost(Duration.ofSeconds(15)).untilAsserted(check::run);
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(check::run);
     }
 
     interface ThrowingRunnable {
