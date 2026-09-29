@@ -22,6 +22,14 @@ jobs:
       - name: Build and test
         run: ./mvnw -B -ntp verify
 
+      # job logs need a login, so put the failing tests where anyone can see them
+      - name: Show failed tests
+        if: failure()
+        run: |
+          for f in $(grep -l -E "<<< (FAILURE|ERROR)" backend/target/surefire-reports/*.txt backend/target/failsafe-reports/*.txt seat-simulator/target/surefire-reports/*.txt 2>/dev/null); do
+            echo "::error title=$(basename "$f" .txt)::$(grep -m1 -A3 -E '<<< (FAILURE|ERROR)' "$f" | tr '\n' ' ' | cut -c1-900)"
+          done
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
