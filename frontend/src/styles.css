@@ -1349,6 +1349,15 @@ time {
     padding: 0 10px;
   }
 
+  /* only the + icon on phones, so the bar fits without sideways scrolling */
+  .topbar__label {
+    display: none;
+  }
+
+  .topbar__nav a {
+    padding: 6px 8px;
+  }
+
   .field-row {
     grid-template-columns: 1fr;
   }
