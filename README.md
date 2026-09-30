@@ -36,17 +36,17 @@ transactional outbox, idempotent consumers, and integration tests on real contai
 
 **Stack:** Java 21 · Spring Boot 3.5 · PostgreSQL 16 + PostGIS · Apache Kafka (KRaft) · Redis 7 · React 19 + Vite + Leaflet · Docker Compose · Testcontainers · GitHub Actions
 
-## Live demo
+## Live
 
 - **App:** https://circl-production-5c12.up.railway.app
 - **API docs (Swagger UI):** https://circl-production-d526.up.railway.app/swagger-ui.html
-- **Demo host login:** `demo.host@circl.dev` / `circl-demo-pass`, or sign up with any email.
+- **Sample host login:** `demo.host@circl.dev` / `circl-demo-pass`, or sign up with any email.
 
 Hosted on free tiers (Railway, Neon, Upstash, Aiven), so the first request after a quiet period can take a few seconds.
 
 ## Contents
 
-- [Live demo](#live-demo)
+- [Live](#live)
 - [Key features](#key-features)
 - [Screenshots](#screenshots)
 - [Architecture](#architecture)
@@ -57,6 +57,8 @@ Hosted on free tiers (Railway, Neon, Upstash, Aiven), so the first request after
 - [Configuration](#configuration)
 - [API reference](#api-reference)
 - [Testing](#testing)
+- [Running in production](#running-in-production)
+- [Known limitations](#known-limitations)
 - [Project structure](#project-structure)
 - [Roadmap](#roadmap)
 
@@ -98,7 +100,20 @@ Hosted on free tiers (Railway, Neon, Upstash, Aiven), so the first request after
 
 ## Architecture
 
-![Architecture](docs/images/architecture.png)
+```mermaid
+flowchart LR
+    Browser["React app<br/>(nginx)"] -- "REST + JWT" --> API["Spring Boot app<br/>REST API, SSE, scheduled jobs"]
+    API -- "seat stream (SSE)" --> Browser
+    API -- "reads and writes,<br/>outbox row in the same transaction" --> PG[("PostgreSQL + PostGIS")]
+    API -- "nearby cache, rate limits,<br/>free-now, seat fan-out" --> Redis[("Redis")]
+    Relay["Outbox relay<br/>(every 2 s)"] -- "unpublished rows" --> PG
+    Relay -- "activity events" --> Kafka[["Kafka topic<br/>circl.activity-events"]]
+    Kafka --> Notif["Notifications consumer"]
+    Kafka --> Seats["Live seats consumer"]
+    Kafka -. "after 3 failed attempts" .-> DLT[["dead-letter topic"]]
+    Notif --> PG
+    Seats --> Redis
+```
 
 Circl is a modular monolith: one Spring Boot application organised by domain (`activity`, `participation`,
 `attendance`, `identity`, `notification`, ...), each with the usual controller, service and repository layers.
@@ -262,13 +277,13 @@ docker compose --profile app up -d --build
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Kafka (from the host) | `localhost:9092` |
 
-Load demo activities around Koramangala, Bengaluru:
+Load sample activities around Koramangala, Bengaluru:
 
 ```bash
-docker exec -i circl-postgres psql -U circl -d circl < scripts/demo_data.sql
+docker exec -i circl-postgres psql -U circl -d circl < scripts/sample_data.sql
 ```
 
-Sign in as the demo host `demo.host@circl.dev` / `circl-demo-pass`, or create an account.
+Sign in with the sample host account `demo.host@circl.dev` / `circl-demo-pass`, or create an account.
 
 > [!NOTE]
 > The first build downloads the base images and dependencies and takes a few minutes (about 2 minutes on the test machine). The backend waits for PostgreSQL, Redis and Kafka to report healthy before it starts.
@@ -289,7 +304,7 @@ Start Docker Desktop (WSL 2 backend) and wait for "Engine running". Run each lin
 git clone https://github.com/Darshan-dev57/Circl.git
 cd Circl
 docker compose --profile app up -d --build
-Get-Content scripts\demo_data.sql | docker exec -i circl-postgres psql -U circl -d circl
+Get-Content scripts\sample_data.sql | docker exec -i circl-postgres psql -U circl -d circl
 ```
 
 Development mode, with the frontend in a second PowerShell window:
@@ -399,6 +414,31 @@ privacy rules, the outbox-to-Kafka round trip, duplicate delivery producing exac
 outages leaving events in the outbox, dead-letter routing, and the live seat stream. GitHub Actions runs the full
 suite on every push.
 
+## Running in production
+
+- **Profile:** start with `SPRING_PROFILES_ACTIVE=prod`. Every secret and connection string comes from the
+  environment with no fallback, and the app refuses to start with the development secrets, secrets shorter than
+  32 characters, a wildcard or `http://` CORS origin, or the local Compose database password
+  ([`application-prod.yml`](backend/src/main/resources/application-prod.yml),
+  [`ProductionChecks`](backend/src/main/java/com/darshan/circl/config/ProductionChecks.java)).
+- **Health checks:** `/livez` and `/readyz` on the public port (readiness includes PostgreSQL and Redis).
+- **Actuator:** only on a separate management port (`MANAGEMENT_PORT`, default 9090) that should not be public.
+- **Metrics (Prometheus):** request latency per endpoint, Hikari pool, outbox backlog and age of the oldest
+  unpublished event, retried and parked events, booking outcomes, Kafka listener failures and consumer lag,
+  scheduled job runs and failures. Locally: `http://localhost:8080/actuator/prometheus` with Docker Compose.
+- **Logs:** JSON (ECS) in the prod profile; every line carries the request id, which is also returned in the
+  `X-Request-Id` header.
+- **Migrations:** Flyway runs on startup.
+
+## Known limitations
+
+- The outbox relay polls every 2 seconds, so live seat updates and notifications arrive about a second after
+  a join rather than instantly.
+- The live deployment runs on free tiers (single small instance, single Kafka broker), so it is not a
+  high-availability setup and the first request after an idle period is slow.
+- Notifications are in-app only (no push or email).
+- The performance numbers come from one shared 4-CPU machine and are best read as before/after comparisons.
+
 ## Project structure
 
 ```
@@ -417,7 +457,7 @@ Circl
 ├── frontend/                    React + Vite + Leaflet
 ├── seat-simulator/              the race condition in plain Java
 ├── load/                        k6 script for nearby search
-├── scripts/                     demo data and a 100k seed
+├── scripts/                     sample data and a 100k seed
 ├── docs/                        diagrams (sources + PNG), screenshots, Postman collection
 ├── docker-compose.yml
 └── .github/workflows/ci.yml
@@ -429,7 +469,6 @@ Circl
 - Appeal review screen for hosts (the API exists)
 - Recurring activities, for example every Sunday at 7 am
 - Activity chat
-- Public deployment with managed PostgreSQL and Kafka
 
 ---
 
