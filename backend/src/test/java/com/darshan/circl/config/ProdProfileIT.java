@@ -2,13 +2,25 @@ package com.darshan.circl.config;
 
 import com.darshan.circl.TestcontainersConfig;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.web.server.LocalManagementPort;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -20,16 +32,37 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "CIRCL_CHECKIN_SECRET=prod-profile-test-checkin-secret-0123456789",
         "CORS_ORIGINS=https://circl.example.com",
         "DB_URL=jdbc:postgresql://replaced-by-testcontainers/circl", "DB_USER=circl", "DB_PASSWORD=not-the-compose-one",
-        "REDIS_HOST=replaced-by-testcontainers", "KAFKA_BOOTSTRAP_SERVERS=replaced-by-testcontainers:9092",
-        "MANAGEMENT_PORT=0"
+        "REDIS_HOST=replaced-by-testcontainers", "KAFKA_BOOTSTRAP_SERVERS=replaced-by-testcontainers:9092"
 })
 @ActiveProfiles("prod")
+// tests switch metrics export off unless asked; these tests read the Prometheus output
+@AutoConfigureObservability(tracing = false)
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
 class ProdProfileIT {
 
     @Autowired
     MockMvc mvc;
+
+    // a fixed free port, because port 0 for both would put actuator back on the public port
+    @DynamicPropertySource
+    static void managementPort(DynamicPropertyRegistry registry) throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            registry.add("MANAGEMENT_PORT", socket::getLocalPort);
+        }
+    }
+
+    @LocalManagementPort
+    int managementPort;
+
+    @Test
+    void metricsAreOnlyOnTheManagementPort() throws Exception {
+        HttpResponse<String> res = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+                URI.create("http://localhost:" + managementPort + "/actuator/prometheus")).build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(res.statusCode()).isEqualTo(200);
+        assertThat(res.body()).contains("circl_outbox_pending");
+    }
 
     @Test
     void corsOnlyAllowsTheConfiguredFrontend() throws Exception {
