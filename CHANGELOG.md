@@ -5,7 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-10-09
+## [0.4.0] - 2026-09-28
 ### Added
 - Apache Kafka (single KRaft node) in Docker Compose and in the integration tests.
 - The outbox relay publishes events to the `circl.activity-events` topic, keyed by activity id, and marks a row published only after the broker acks it. If Kafka is down the row stays and is retried with backoff.
@@ -30,7 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - README rewritten: overview, key features, architecture with Kafka, engineering highlights, configuration and testing sections.
 - README Windows steps are plain PowerShell lines.
 
-## [0.3.0] - 2026-10-09
+## [0.3.0] - 2026-09-25
 ### Added
 - React + Vite + Leaflet frontend: map of nearby activities, activity page with a live seat ring, bookings, host view and a form to post activities.
 - Live seat counts over Server-Sent Events, fanned out to every instance through a Redis channel.
@@ -48,7 +48,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Nearby results include the pin coordinates.
 - CI builds and lints the frontend.
 
-## [0.2.0] - 2026-10-09
+## [0.2.0] - 2026-09-21
 ### Added
 - Join with friends (`partySize` 1-4) and a party-aware waitlist: a freed seat goes to the first party that fits and is held for 15 minutes.
 - Claim and decline endpoints for waitlist offers, plus a ShedLock job that expires unclaimed offers.
@@ -58,7 +58,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - No-show appeals with a 48-hour window and host decisions.
 - Reliability score and a per-activity minimum score to join.
 
-## [0.1.0] - 2026-10-08
+## [0.1.0] - 2026-09-20
 ### Added
 - Plain Java seat simulator showing the race and three fixes.
 - Activities API with validation, Problem Details errors and paging.

@@ -10,7 +10,7 @@ the last run is committed in [`results/`](results).
   each result file). Absolute numbers will differ on your machine; compare the pairs, not the values.
 - Java 21 (Temurin), Spring Boot 3.5, PostgreSQL 16 + PostGIS 3.4, Redis 7, Apache Kafka 3.9 (single broker),
   k6 for HTTP load. Backend started from the jar with the default settings (`CACHE_TYPE` switched per run).
-- Measured on Oct 11, 2026 at commit `d0c80ed`.
+- Measured on Sep 30, 2026 at commit `d620be1`.
 
 ## Start the stack
 
