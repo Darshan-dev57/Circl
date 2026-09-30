@@ -1,0 +1,48 @@
+# Settings for a real deployment, switched on with SPRING_PROFILES_ACTIVE=prod.
+# Secrets and connection strings have no default here: if one is missing the app stops at startup
+# instead of running with a development value. ProductionChecks rejects the development values too.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+circl:
+  jwt:
+    secret: ${CIRCL_JWT_SECRET}
+  checkin:
+    secret: ${CIRCL_CHECKIN_SECRET}
+  auth:
+    # served over HTTPS only, so the refresh cookie is always Secure
+    cookie-secure: true
+  cors:
+    # the deployed frontend, for example https://circl.example.com (comma separated, no wildcards)
+    allowed-origins: ${CORS_ORIGINS}
+
+server:
+  # the host ends HTTPS at its proxy and passes the original scheme in X-Forwarded-Proto
+  forward-headers-strategy: framework
+
+management:
+  server:
+    # metrics stay on a port the public domain does not route to
+    port: ${MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        # /livez and /readyz on the public port for the host's health check
+        add-additional-paths: true
+
+logging:
+  structured:
+    format:
+      console: ecs
