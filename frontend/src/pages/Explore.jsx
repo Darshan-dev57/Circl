@@ -8,7 +8,7 @@ import SeatRing from '../components/SeatRing'
 import { CATEGORIES, distance, seatsText, when } from '../format'
 import { useApi, useDebounced } from '../hooks'
 
-// Koramangala, Bengaluru: where most of the demo data lives
+// Koramangala, Bengaluru: where most of the sample data lives
 const START = { lat: 12.9352, lng: 77.6245 }
 const RADII = [1, 3, 5, 10]
 

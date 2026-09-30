@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 PSQL="docker exec -i circl-postgres psql -U circl -d circl -X -q"
 
-seeded=$($PSQL -tA -c "SELECT count(*) FROM activities WHERE description = 'seeded demo activity'")
+seeded=$($PSQL -tA -c "SELECT count(*) FROM activities WHERE description = 'seeded sample activity'")
 if [ "$seeded" -lt 100000 ]; then
   $PSQL -v n=$((100000 - seeded)) < scripts/seed_activities.sql > /dev/null
 fi
