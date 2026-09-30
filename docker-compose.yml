@@ -72,6 +72,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-circl}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      # local only: http://localhost:8080/actuator/prometheus
+      ACTUATOR_ENDPOINTS: health,info,prometheus
       # DEV ONLY fallbacks, put real secrets (32+ characters) in .env
       CIRCL_JWT_SECRET: ${CIRCL_JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       CIRCL_CHECKIN_SECRET: ${CIRCL_CHECKIN_SECRET:-dev-only-checkin-secret-change-me-0123456789}
