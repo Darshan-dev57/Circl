@@ -1,0 +1,11 @@
+join 1: seat update after 0.73 s
+join 2: seat update after 0.88 s
+join 3: seat update after 0.90 s
+join 4: seat update after 0.85 s
+join 5: seat update after 0.84 s
+join 6: seat update after 0.93 s
+join 7: seat update after 0.90 s
+join 8: seat update after 0.94 s
+join 9: seat update after 0.90 s
+join 10: seat update after 0.93 s
+min 0.73 s, median 0.90 s, max 0.94 s over 10 joins

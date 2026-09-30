@@ -1,0 +1,18 @@
+--- run 1
+100 threads, 10 seats
+A: no lock                   winners= 51 taken= 51 overbooked=41
+B: synchronized              winners= 10 taken= 10 overbooked=0
+C: AtomicInteger CAS         winners= 10 taken= 10 overbooked=0
+D: ReentrantLock             winners= 10 taken= 10 overbooked=0
+--- run 2
+100 threads, 10 seats
+A: no lock                   winners= 38 taken= 38 overbooked=28
+B: synchronized              winners= 10 taken= 10 overbooked=0
+C: AtomicInteger CAS         winners= 10 taken= 10 overbooked=0
+D: ReentrantLock             winners= 10 taken= 10 overbooked=0
+--- run 3
+100 threads, 10 seats
+A: no lock                   winners= 28 taken= 28 overbooked=18
+B: synchronized              winners= 10 taken= 10 overbooked=0
+C: AtomicInteger CAS         winners= 10 taken= 10 overbooked=0
+D: ReentrantLock             winners= 10 taken= 10 overbooked=0

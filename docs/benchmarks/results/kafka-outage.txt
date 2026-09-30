@@ -1,0 +1,26 @@
+--- run 0 (same script before a fix to the notifications path; it stopped after this line)
+broker paused; 20 joins while it is down
+after 5 s with the broker down: 20 of 20 join events waiting in the outbox
+broker back
+outbox empty 6.4 s after the broker came back
+--- run 1
+broker paused; 20 joins while it is down
+after 5 s with the broker down: 20 of 20 join events waiting in the outbox
+broker back
+outbox empty 0.8 s after the broker came back
+host notifications for this activity: 20 of 20; parked events: 0
+RESULT: no events lost
+--- run 2
+broker paused; 20 joins while it is down
+after 5 s with the broker down: 20 of 20 join events waiting in the outbox
+broker back
+outbox empty 0.8 s after the broker came back
+host notifications for this activity: 20 of 20; parked events: 0
+RESULT: no events lost
+--- run 3
+broker paused; 20 joins while it is down
+after 5 s with the broker down: 20 of 20 join events waiting in the outbox
+broker back
+outbox empty 0.7 s after the broker came back
+host notifications for this activity: 20 of 20; parked events: 0
+RESULT: no events lost
