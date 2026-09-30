@@ -1,0 +1,28 @@
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=143.4ms p95=271.2ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=152.6ms p95=281.1ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=45 p50=91.7ms p95=174.3ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=153.5ms p95=329.5ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=155.4ms p95=290.3ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=39 p50=89.5ms p95=147.3ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=165.9ms p95=266.6ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=148.0ms p95=321.7ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=43 p50=114.6ms p95=186.7ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=158.5ms p95=273.1ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=179.3ms p95=315.9ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=42 p50=147.2ms p95=237.0ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=127.2ms p95=218.5ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=158.7ms p95=423.1ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=43 p50=77.9ms p95=131.1ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=145.6ms p95=233.9ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=212.5ms p95=516.7ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=31 p50=90.7ms p95=219.1ms
+HTTP, conditional update, 60 users / 10 seats: joined=10 waitlisted=50 seats_taken=10
+CONDITIONAL_UPDATE: runs=5 joins=250 overbooked=0 retries=0 p50=126.2ms p95=261.7ms
+PESSIMISTIC: runs=5 joins=250 overbooked=0 retries=0 p50=158.7ms p95=274.4ms
+OPTIMISTIC: runs=5 joins=250 overbooked=0 retries=37 p50=99.5ms p95=160.4ms

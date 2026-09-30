@@ -133,7 +133,7 @@ none and is waitlisted. There is no read-then-write window for a race to exploit
 
 - **Idempotency:** the `Idempotency-Key` row is written in the same transaction. A retry returns the stored response, a reused key with a different body is rejected, and a key still in flight returns `409`.
 - **Strategy comparison:** pessimistic (`SELECT ... FOR UPDATE`) and optimistic (`@Version` with retries) implementations sit behind `CIRCL_JOIN_STRATEGY` and are exercised by the same race tests.
-- **Seat simulator:** the [`seat-simulator`](seat-simulator) module reproduces the race in plain Java (`ExecutorService` + `CountDownLatch`). Without a lock, 100 threads booked 35 of 10 seats in one run; `synchronized`, `AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10. Run it with `java -cp seat-simulator/target/classes com.darshan.circl.sim.SeatSimulator` after a build.
+- **Seat simulator:** the [`seat-simulator`](seat-simulator) module reproduces the race in plain Java (`ExecutorService` + `CountDownLatch`). Without a lock, 100 threads booked 28 to 51 of 10 seats over three runs; `synchronized`, `AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10. Run it with `java -cp seat-simulator/target/classes com.darshan.circl.sim.SeatSimulator` after a build.
 
 ### Reliable events: transactional outbox and Kafka
 
@@ -210,19 +210,20 @@ The schema is managed by Flyway migrations (`V1` to `V7`); Hibernate only valida
 
 ## Performance
 
-Measured on a single 4-CPU machine running the application, database and load generator together.
-Treat these as relative comparisons rather than production figures.
+Measured on one shared 4-CPU machine running the application, databases, load generator and other builds at
+the same time, so compare each pair rather than the absolute values. Every row has a command, its source and
+the raw output in [docs/benchmarks](docs/benchmarks).
 
 | Scenario | Result |
 |---|---|
-| Nearby search, 100k activities, 3 km radius | 72 to 85 ms without an index; about **8 ms** with a GiST index and KNN ordering |
-| Nearby search under load (k6, 50 virtual users, 30 s) | uncached: p95 363 ms, 294 req/s; Redis-cached: **p95 34 ms, 3014 req/s**, 0 errors |
-| 60 concurrent HTTP joins for 10 seats | 10 joined, 50 waitlisted, 0 overbooked |
-| 50 threads racing for the last seat, 20 rounds per strategy | conditional update p50 85 ms, pessimistic 96 ms, optimistic 57 ms with 143 retries; 0 overbooked in all three |
+| Nearby search query, 100k activities, 3 km radius | 97 to 157 ms without an index; **15 to 38 ms** with the GiST index |
+| Nearby search API under load (k6, 50 virtual users, 30 s) | cache off: p95 492 to 661 ms, 166 to 227 req/s; Redis cache: **p95 73 to 86 ms, 1318 to 1594 req/s**, 0 errors |
+| 60 concurrent HTTP joins for 10 seats | 10 joined, 50 waitlisted, 0 overbooked (7 of 7 runs) |
+| 50 threads racing for the last seat, 5 rounds per strategy | 0 overbooked in all three; p50 conditional update 126 to 166 ms, pessimistic 148 to 213 ms, optimistic 78 to 147 ms with 31 to 45 retries |
 | 10 parallel requests sharing one `Idempotency-Key` | 1 participant row, 1 seat taken |
-| Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (varies per run) |
-| Join to live seat update in the browser (through Kafka and nginx) | 1.1 to 1.8 s, median 1.2 s over 7 joins; most of it is the 2 s outbox poll |
-| Kafka stopped during a leave, then restarted | the event stayed in the outbox and was delivered 6 s after the broker came back |
+| Seat simulator, 100 threads, 10 seats, no lock | 28 to 51 booked (varies per run); every locking variant stops at 10 |
+| Join to live seat update over SSE (through Kafka) | 0.73 to 0.94 s, median 0.90 s over 10 joins; most of it is the 2 s outbox poll |
+| Kafka broker down during 20 joins, then back | all 20 events waited in the outbox and went out 0.7 to 6.4 s after the broker returned; 20 of 20 notifications, none lost |
 
 ## Tech stack and rationale
 
@@ -389,7 +390,7 @@ Postman collection is available in [`docs/postman`](docs/postman/circl.postman_c
 cd frontend && npm run lint && npm run build
 ```
 
-**133 tests:** 9 for the seat simulator, 32 unit tests and 92 integration tests. Integration tests run
+**172 tests:** 9 for the seat simulator, 38 unit tests and 125 integration tests. Integration tests run
 against real PostgreSQL + PostGIS, Redis and Kafka containers started by Testcontainers.
 
 Coverage includes 60 parallel HTTP joins for 10 seats, last-seat races under each locking strategy, idempotent

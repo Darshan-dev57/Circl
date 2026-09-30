@@ -1,0 +1,43 @@
+--- first run (load average: about 45, other builds running on the same box)
+activities in table: 100002
+== with GiST index
+                     ->  Parallel Bitmap Heap Scan on activities a  (cost=143.43..29602.29 rows=6 width=77) (actual time=71.176..78.445 rows=1316 loops=2)
+                           ->  Bitmap Index Scan on idx_activities_location  (cost=0.00..143.43 rows=3603 width=0) (actual time=1.130..1.131 rows=3580 loops=1)
+ Execution Time: 91.903 ms
+                     ->  Parallel Bitmap Heap Scan on activities a  (cost=143.43..29602.29 rows=6 width=77) (actual time=0.557..4.272 rows=1316 loops=2)
+                           ->  Bitmap Index Scan on idx_activities_location  (cost=0.00..143.43 rows=3603 width=0) (actual time=0.835..0.836 rows=3580 loops=1)
+ Execution Time: 15.212 ms
+                     ->  Parallel Bitmap Heap Scan on activities a  (cost=143.43..29602.29 rows=6 width=77) (actual time=0.548..4.311 rows=1316 loops=2)
+                           ->  Bitmap Index Scan on idx_activities_location  (cost=0.00..143.43 rows=3603 width=0) (actual time=0.812..0.812 rows=3580 loops=1)
+ Execution Time: 15.322 ms
+                     ->  Parallel Bitmap Heap Scan on activities a  (cost=143.43..29602.29 rows=6 width=77) (actual time=6.897..13.378 rows=1316 loops=2)
+                           ->  Bitmap Index Scan on idx_activities_location  (cost=0.00..143.43 rows=3603 width=0) (actual time=0.884..0.885 rows=3580 loops=1)
+ Execution Time: 29.070 ms
+                     ->  Parallel Bitmap Heap Scan on activities a  (cost=143.43..29602.29 rows=6 width=77) (actual time=5.261..13.934 rows=1316 loops=2)
+                           ->  Bitmap Index Scan on idx_activities_location  (cost=0.00..143.43 rows=3603 width=0) (actual time=1.599..1.599 rows=3580 loops=1)
+ Execution Time: 25.228 ms
+== without GiST index
+                     ->  Parallel Seq Scan on activities a  (cost=0.00..739118.76 rows=6 width=77) (actual time=4.371..85.781 rows=1316 loops=2)
+ Execution Time: 97.445 ms
+                     ->  Parallel Seq Scan on activities a  (cost=0.00..739118.76 rows=6 width=77) (actual time=4.287..90.458 rows=1316 loops=2)
+ Execution Time: 101.593 ms
+                     ->  Parallel Seq Scan on activities a  (cost=0.00..739118.76 rows=6 width=77) (actual time=4.307..92.324 rows=1316 loops=2)
+ Execution Time: 103.259 ms
+                     ->  Parallel Seq Scan on activities a  (cost=0.00..739118.76 rows=6 width=77) (actual time=4.124..87.188 rows=1316 loops=2)
+ Execution Time: 100.151 ms
+                     ->  Parallel Seq Scan on activities a  (cost=0.00..739118.76 rows=6 width=77) (actual time=4.578..92.184 rows=1316 loops=2)
+ Execution Time: 105.472 ms
+--- second run, box quieter (load average: 8.38, 45.51, 50.97)
+activities in table: 100006
+== with GiST index
+ Execution Time: 37.603 ms
+ Execution Time: 34.658 ms
+ Execution Time: 17.883 ms
+ Execution Time: 19.106 ms
+ Execution Time: 23.479 ms
+== without GiST index
+ Execution Time: 152.453 ms
+ Execution Time: 106.870 ms
+ Execution Time: 137.678 ms
+ Execution Time: 130.081 ms
+ Execution Time: 157.342 ms
