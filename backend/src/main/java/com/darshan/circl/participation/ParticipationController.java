@@ -1,8 +1,10 @@
 package com.darshan.circl.participation;
 
+import com.darshan.circl.common.error.ApiException;
 import com.darshan.circl.common.web.CurrentUser;
 import com.darshan.circl.participation.dto.JoinRequest;
 import com.darshan.circl.participation.dto.JoinResponse;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -26,9 +28,11 @@ import java.util.UUID;
 public class ParticipationController {
 
     private final ParticipationService service;
+    private final MeterRegistry metrics;
 
-    public ParticipationController(ParticipationService service) {
+    public ParticipationController(ParticipationService service, MeterRegistry metrics) {
         this.service = service;
+        this.metrics = metrics;
     }
 
     @PostMapping("/join")
@@ -37,7 +41,17 @@ public class ParticipationController {
                                              @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 80) String key,
                                              @Valid @RequestBody(required = false) JoinRequest body) {
         int partySize = body == null ? 1 : body.partySizeOrDefault();
-        ParticipationService.JoinResult result = service.join(activityId, CurrentUser.id(jwt), partySize, key);
+        ParticipationService.JoinResult result;
+        try {
+            result = service.join(activityId, CurrentUser.id(jwt), partySize, key);
+        } catch (ApiException e) {
+            // e.g. activity full for the party, already started, too low a reliability score
+            metrics.counter("circl.bookings", "outcome", "failed", "reason", e.getClass().getSimpleName()).increment();
+            throw e;
+        }
+        // same tag names on every booking counter, Prometheus drops meters whose tag names differ
+        metrics.counter("circl.bookings", "outcome", result.replayed() ? "replayed"
+                : result.response().status().name().toLowerCase(), "reason", "none").increment();
         return ResponseEntity.ok()
                 .header("Idempotent-Replayed", String.valueOf(result.replayed()))
                 .body(result.response());
