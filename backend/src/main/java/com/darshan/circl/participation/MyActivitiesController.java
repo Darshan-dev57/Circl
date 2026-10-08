@@ -1,7 +1,9 @@
 package com.darshan.circl.participation;
 
 import com.darshan.circl.common.web.CurrentUser;
+import com.darshan.circl.activity.dto.ActivitySummary;
 import com.darshan.circl.participation.dto.MyActivitiesPage;
+import com.darshan.circl.participation.dto.MyStatus;
 import com.darshan.circl.participation.dto.ParticipantView;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -33,6 +35,17 @@ public class MyActivitiesController {
                                  @RequestParam(required = false) String cursor,
                                  @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
         return service.mine(CurrentUser.id(jwt), "past".equals(when), cursor, size);
+    }
+
+    @GetMapping("/api/v1/activities/{activityId}/participants/me")
+    public MyStatus myStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID activityId) {
+        return service.statusOn(activityId, CurrentUser.id(jwt));
+    }
+
+    /** activities I host, from 12 hours ago onwards so tonight's game is still on the list while it runs */
+    @GetMapping("/api/v1/me/hosting")
+    public List<ActivitySummary> hosting(@AuthenticationPrincipal Jwt jwt) {
+        return service.hosting(CurrentUser.id(jwt));
     }
 
     @GetMapping("/api/v1/activities/{activityId}/participants")

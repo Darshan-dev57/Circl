@@ -1,18 +1,22 @@
 package com.darshan.circl.participation;
 
 import com.darshan.circl.activity.Activity;
+import com.darshan.circl.activity.ActivityMapper;
 import com.darshan.circl.activity.ActivityRepository;
+import com.darshan.circl.activity.dto.ActivitySummary;
 import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.web.Cursor;
 import com.darshan.circl.participation.dto.MyActivitiesPage;
 import com.darshan.circl.participation.dto.MyActivity;
+import com.darshan.circl.participation.dto.MyStatus;
 import com.darshan.circl.participation.dto.ParticipantView;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -26,13 +30,15 @@ public class MyActivitiesService {
     private final ParticipantRepository participants;
     private final ActivityRepository activities;
     private final JdbcTemplate jdbc;
+    private final ActivityMapper mapper;
     private final Clock clock;
 
     public MyActivitiesService(ParticipantRepository participants, ActivityRepository activities, JdbcTemplate jdbc,
-                               Clock clock) {
+                               ActivityMapper mapper, Clock clock) {
         this.participants = participants;
         this.activities = activities;
         this.jdbc = jdbc;
+        this.mapper = mapper;
         this.clock = clock;
     }
 
@@ -68,5 +74,38 @@ public class MyActivitiesService {
                  ORDER BY p.joined_at
                 """, (rs, i) -> new ParticipantView(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
                 rs.getString(3), rs.getInt(4), rs.getString(5), rs.getBoolean(6), rs.getTimestamp(7).toInstant()), activityId);
+    }
+
+    @Transactional(readOnly = true)
+    public MyStatus statusOn(UUID activityId, UUID userId) {
+        if (!activities.existsById(activityId)) {
+            throw new NotFoundException("Activity", activityId);
+        }
+        List<MyStatus> joined = jdbc.query("""
+                SELECT party_size, attendance_status FROM participants
+                 WHERE activity_id = ? AND user_id = ? AND status = 'JOINED'
+                """, (rs, i) -> new MyStatus("JOINED", rs.getInt(1), null, null, null, rs.getString(2)), activityId, userId);
+        if (!joined.isEmpty()) {
+            return joined.get(0);
+        }
+        // position = how many waiting parties are ahead of me, plus me
+        List<MyStatus> waiting = jdbc.query("""
+                SELECT w.id, w.status, w.party_size, w.claim_deadline,
+                       (SELECT count(*) FROM waitlist o
+                         WHERE o.activity_id = w.activity_id AND o.status = 'WAITING' AND o.position <= w.position) AS rank
+                  FROM waitlist w
+                 WHERE w.activity_id = ? AND w.user_id = ? AND w.status IN ('WAITING', 'OFFERED')
+                """, (rs, i) -> "OFFERED".equals(rs.getString("status"))
+                ? new MyStatus("OFFERED", rs.getInt("party_size"), null, rs.getObject("id", UUID.class),
+                        rs.getTimestamp("claim_deadline").toInstant(), null)
+                : new MyStatus("WAITLISTED", rs.getInt("party_size"), rs.getLong("rank"), null, null, null),
+                activityId, userId);
+        return waiting.isEmpty() ? MyStatus.none() : waiting.get(0);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActivitySummary> hosting(UUID hostId) {
+        return activities.findTop50ByHostIdAndStartsAtAfterOrderByStartsAt(hostId, Instant.now(clock).minus(Duration.ofHours(12)))
+                .stream().map(mapper::toSummary).toList();
     }
 }
