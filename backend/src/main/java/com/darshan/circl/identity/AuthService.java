@@ -3,6 +3,7 @@ package com.darshan.circl.identity;
 import com.darshan.circl.common.error.ConflictException;
 import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
+import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.error.UnauthorizedException;
 import com.darshan.circl.common.text.TextSanitizer;
 import com.darshan.circl.config.JwtProperties;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
@@ -58,6 +60,10 @@ public class AuthService {
         Role role = req.role() == null ? Role.PARTICIPANT : req.role();
         if (role == Role.ADMIN) {
             throw new ForbiddenException("ADMIN cannot be chosen at signup");
+        }
+        // @Size counts characters, but BCrypt takes at most 72 bytes and a Kannada letter is 3 of them
+        if (req.password().getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new RuleViolationException("password-too-long", "Password is too long, use at most 72 bytes");
         }
         if (users.existsByEmail(email)) {
             throw new ConflictException("email-taken", "An account with this email already exists");
