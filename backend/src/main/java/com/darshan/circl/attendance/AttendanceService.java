@@ -30,12 +30,15 @@ public class AttendanceService {
     private final Outbox outbox;
     private final Duration opensBefore;
     private final Duration grace;
+    private final Duration scoresFinalAfterEnd;
     private final Clock clock;
 
     public AttendanceService(ActivityRepository activities, ParticipantRepository participants, AttendanceLog log,
                              CheckinTokens tokens, Outbox outbox,
                              @Value("${circl.checkin.opens-before:PT30M}") Duration opensBefore,
                              @Value("${circl.checkin.grace-after-start:PT15M}") Duration grace,
+                             @Value("${circl.attendance.finalize-after-end:PT2H}") Duration finalizeAfterEnd,
+                             @Value("${circl.attendance.appeal-window:PT48H}") Duration appealWindow,
                              Clock clock) {
         this.activities = activities;
         this.participants = participants;
@@ -44,6 +47,7 @@ public class AttendanceService {
         this.outbox = outbox;
         this.opensBefore = opensBefore;
         this.grace = grace;
+        this.scoresFinalAfterEnd = finalizeAfterEnd.plus(appealWindow);
         this.clock = clock;
     }
 
@@ -120,6 +124,24 @@ public class AttendanceService {
             log.record(p.getId(), from, to, Actor.HOST, cleanNote);
         }
         return p;
+    }
+
+    /**
+     * The host reports that check-in was not working (no network at the ground, the code would not load).
+     * Nobody on this activity gets a no-show penalty. Allowed from the start until scores become final.
+     */
+    @Transactional
+    public void markCheckinUnreliable(UUID activityId, UUID hostId) {
+        Activity activity = activity(activityId);
+        requireHost(activity, hostId);
+        Instant now = Instant.now(clock);
+        if (now.isBefore(activity.getStartsAt())) {
+            throw new RuleViolationException("activity-not-started", "Check-in can only be reported broken once the activity has started");
+        }
+        if (now.isAfter(activity.endsAt().plus(scoresFinalAfterEnd))) {
+            throw new RuleViolationException("scores-final", "Scores for this activity are already final");
+        }
+        activity.markAttendanceUnreliable();
     }
 
     private Activity activity(UUID id) {
