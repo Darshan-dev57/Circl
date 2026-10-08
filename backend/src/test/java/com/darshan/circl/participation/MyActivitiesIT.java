@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -79,5 +80,52 @@ class MyActivitiesIT {
                 .andExpect(jsonPath("$[0].userId").value(me.id().toString()));
         mvc.perform(get("/api/v1/activities/{id}/participants", id).header("Authorization", me.bearer()))
                 .andExpect(status().isForbidden());
+    }
+
+    private void join(TestUser u, UUID activity, int party) throws Exception {
+        mvc.perform(post("/api/v1/activities/{id}/join", activity).header("Authorization", u.bearer())
+                .header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType("application/json").content("{\"partySize\":" + party + "}")).andExpect(status().isOk());
+    }
+
+    @Test
+    void myStatusOnAnActivity() throws Exception {
+        TestUser host = Users.host(mvc);
+        TestUser a = Users.participant(mvc), b = Users.participant(mvc), c = Users.participant(mvc), d = Users.participant(mvc);
+        UUID activity = Activities.create(mvc, host, 2);
+        join(a, activity, 2);
+        join(b, activity, 1);
+        join(c, activity, 1);
+
+        mvc.perform(get("/api/v1/activities/{id}/participants/me", activity).header("Authorization", a.bearer()))
+                .andExpect(jsonPath("$.status").value("JOINED"))
+                .andExpect(jsonPath("$.partySize").value(2))
+                .andExpect(jsonPath("$.attendanceStatus").value("RSVP"));
+        mvc.perform(get("/api/v1/activities/{id}/participants/me", activity).header("Authorization", c.bearer()))
+                .andExpect(jsonPath("$.status").value("WAITLISTED"))
+                .andExpect(jsonPath("$.waitlistPosition").value(2));
+        mvc.perform(get("/api/v1/activities/{id}/participants/me", activity).header("Authorization", d.bearer()))
+                .andExpect(jsonPath("$.status").value("NONE"))
+                .andExpect(jsonPath("$.partySize").doesNotExist());
+
+        mvc.perform(delete("/api/v1/activities/{id}/participants/me", activity).header("Authorization", a.bearer()))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/activities/{id}/participants/me", activity).header("Authorization", b.bearer()))
+                .andExpect(jsonPath("$.status").value("OFFERED"))
+                .andExpect(jsonPath("$.offerId").exists())
+                .andExpect(jsonPath("$.claimDeadline").exists());
+        mvc.perform(get("/api/v1/activities/{id}/participants/me", UUID.randomUUID()).header("Authorization", b.bearer()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void hostingListsOnlyMyOwnActivities() throws Exception {
+        TestUser host = Users.host(mvc), other = Users.host(mvc);
+        UUID mine = Activities.create(mvc, host, 4);
+        Activities.create(mvc, other, 4);
+        mvc.perform(get("/api/v1/me/hosting").header("Authorization", host.bearer()))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(mine.toString()))
+                .andExpect(jsonPath("$[0].lat").exists());
     }
 }
