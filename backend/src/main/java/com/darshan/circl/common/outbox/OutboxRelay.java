@@ -1,5 +1,6 @@
 package com.darshan.circl.common.outbox;
 
+import com.darshan.circl.activity.live.SeatStream;
 import com.darshan.circl.notification.EventNotifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -30,15 +33,17 @@ public class OutboxRelay {
     private final JdbcTemplate jdbc;
     private final OutboxRepository events;
     private final EventNotifier notifier;
+    private final SeatStream seats;
     private final TransactionTemplate tx;
     private final TransactionTemplate failureTx;
     private final Clock clock;
 
     public OutboxRelay(JdbcTemplate jdbc, OutboxRepository events, EventNotifier notifier,
-                       PlatformTransactionManager txManager, Clock clock) {
+                       SeatStream seats, PlatformTransactionManager txManager, Clock clock) {
         this.jdbc = jdbc;
         this.events = events;
         this.notifier = notifier;
+        this.seats = seats;
         this.tx = new TransactionTemplate(txManager);
         this.failureTx = new TransactionTemplate(txManager);
         this.clock = clock;
@@ -52,25 +57,31 @@ public class OutboxRelay {
     /** returns how many events were published */
     public int relayBatch(int limit) {
         int published = 0;
+        Set<UUID> seatsChanged = new LinkedHashSet<>();
         for (int i = 0; i < limit; i++) {
             UUID[] current = new UUID[1];
             try {
-                Boolean done = tx.execute(status -> relayOne(current));
+                OutboxEvent done = tx.execute(status -> relayOne(current));
                 if (done == null) {
                     break;
                 }
                 published++;
+                if (SeatStream.SEAT_EVENTS.contains(done.getType())) {
+                    seatsChanged.add(done.getAggregateId());
+                }
             } catch (RuntimeException e) {
                 // the event's transaction is rolled back by now, so its row lock is gone
                 log.warn("Outbox event {} failed: {}", current[0], e.getMessage());
                 recordFailure(current[0], e);
             }
         }
+        // after the commits, so browsers never see a seat count that was rolled back
+        seats.publish(seatsChanged);
         return published;
     }
 
     /** null = nothing left to do */
-    private Boolean relayOne(UUID[] current) {
+    private OutboxEvent relayOne(UUID[] current) {
         List<UUID> next = jdbc.queryForList("""
                 SELECT id FROM outbox_events
                  WHERE published_at IS NULL AND failed_at IS NULL
@@ -86,7 +97,7 @@ public class OutboxRelay {
         OutboxEvent event = events.findById(next.get(0)).orElseThrow();
         notifier.handle(event);
         event.markPublished(Instant.now(clock));
-        return true;
+        return event;
     }
 
     private void recordFailure(UUID id, RuntimeException e) {
