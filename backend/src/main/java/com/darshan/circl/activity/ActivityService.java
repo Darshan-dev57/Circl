@@ -88,7 +88,7 @@ public class ActivityService {
                         Instant.now(clock), limit)
                 .stream()
                 .map(r -> new ActivitySummary(r.getId(), r.getTitle(), Category.valueOf(r.getCategory()),
-                        r.getStartsAt(), r.getCapacity(), r.getCapacity() - r.getSeatsTaken(),
+                        r.getStartsAt(), r.getLat(), r.getLng(), r.getCapacity(), r.getCapacity() - r.getSeatsTaken(),
                         Math.round(r.getDistanceM() * 10) / 10.0))
                 .toList();
     }

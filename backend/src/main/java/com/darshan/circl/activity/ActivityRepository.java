@@ -38,7 +38,8 @@ public interface ActivityRepository extends JpaRepository<Activity, UUID> {
     Optional<ActivityGate> findGateById(@Param("id") UUID id);
 
     @Query(value = """
-            SELECT a.id, a.title, a.category, a.starts_at AS startsAt, a.capacity, a.seats_taken AS seatsTaken,
+            SELECT a.id, a.title, a.category, a.starts_at AS startsAt, a.latitude AS lat, a.longitude AS lng,
+                   a.capacity, a.seats_taken AS seatsTaken,
                    ST_Distance(a.location, ST_MakePoint(:lng, :lat)::geography) AS distanceM
             FROM activities a
             WHERE a.status = 'OPEN'
