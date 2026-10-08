@@ -36,7 +36,7 @@ class ActivityServiceTest {
         UUID id = UUID.randomUUID();
         when(repo.findByIdForUpdate(id)).thenReturn(Optional.of(a));
 
-        assertThatThrownBy(() -> service.update(id, null, true, new UpdateActivityRequest(null, null, null, null, 5)))
+        assertThatThrownBy(() -> service.update(id, null, true, new UpdateActivityRequest(null, null, null, null, 5, null)))
                 .isInstanceOf(RuleViolationException.class)
                 .hasMessageContaining("6 seats");
     }

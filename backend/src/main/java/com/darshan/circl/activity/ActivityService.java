@@ -47,6 +47,9 @@ public class ActivityService {
                 req.startsAt(),
                 req.durationMinutes() == null ? 60 : req.durationMinutes(),
                 req.capacity());
+        if (req.minReliability() != null) {
+            activity.setMinReliability(req.minReliability());
+        }
         return mapper.toDetail(activities.save(activity));
     }
 
@@ -93,6 +96,9 @@ public class ActivityService {
         }
         if (req.durationMinutes() != null) {
             activity.setDurationMinutes(req.durationMinutes());
+        }
+        if (req.minReliability() != null) {
+            activity.setMinReliability(req.minReliability());
         }
         if (req.capacity() != null) {
             if (req.capacity() < activity.getSeatsTaken()) {

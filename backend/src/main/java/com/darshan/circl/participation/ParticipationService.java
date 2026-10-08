@@ -4,11 +4,16 @@ import com.darshan.circl.activity.Activity;
 import com.darshan.circl.activity.ActivityGate;
 import com.darshan.circl.activity.ActivityRepository;
 import com.darshan.circl.activity.ActivityStatus;
+import com.darshan.circl.attendance.Actor;
+import com.darshan.circl.attendance.AttendanceLog;
+import com.darshan.circl.attendance.AttendanceStatus;
 import com.darshan.circl.common.error.ConflictException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.outbox.Outbox;
 import com.darshan.circl.identity.TokenService;
+import com.darshan.circl.identity.User;
+import com.darshan.circl.identity.UserRepository;
 import com.darshan.circl.participation.dto.JoinResponse;
 import com.darshan.circl.participation.dto.JoinResponse.JoinOutcome;
 import com.darshan.circl.participation.engine.JoinStrategy;
@@ -49,6 +54,8 @@ public class ParticipationService {
     private final IdempotencyService idempotency;
     private final CapacityLedger ledger;
     private final WaitlistOffers offers;
+    private final AttendanceLog attendanceLog;
+    private final UserRepository users;
     private final Outbox outbox;
     private final Map<JoinStrategy, SeatAllocator> allocators = new EnumMap<>(JoinStrategy.class);
     private final JoinStrategy defaultStrategy;
@@ -57,7 +64,8 @@ public class ParticipationService {
 
     public ParticipationService(ActivityRepository activities, ParticipantRepository participants,
                                 WaitlistRepository waitlist, IdempotencyService idempotency,
-                                CapacityLedger ledger, WaitlistOffers offers, Outbox outbox,
+                                CapacityLedger ledger, WaitlistOffers offers, AttendanceLog attendanceLog,
+                                UserRepository users, Outbox outbox,
                                 List<SeatAllocator> allocators,
                                 @Value("${circl.join.strategy:CONDITIONAL_UPDATE}") JoinStrategy defaultStrategy,
                                 PlatformTransactionManager txManager, Clock clock) {
@@ -67,6 +75,8 @@ public class ParticipationService {
         this.idempotency = idempotency;
         this.ledger = ledger;
         this.offers = offers;
+        this.attendanceLog = attendanceLog;
+        this.users = users;
         this.outbox = outbox;
         allocators.forEach(a -> this.allocators.put(a.strategy(), a));
         this.defaultStrategy = defaultStrategy;
@@ -121,6 +131,13 @@ public class ParticipationService {
         if (gate.getHostId().equals(userId)) {
             throw new RuleViolationException("host-cannot-join", "You are hosting this activity");
         }
+        if (gate.getMinReliability() > 0) {
+            int score = users.findById(userId).map(User::getReliabilityScore).orElse(0);
+            if (score < gate.getMinReliability()) {
+                throw new RuleViolationException("reliability-too-low",
+                        "This host asks for a reliability score of " + gate.getMinReliability() + ", yours is " + score);
+            }
+        }
 
         Participant existing = participants.findByActivityIdAndUserId(activityId, userId).orElse(null);
         if (existing != null && existing.isJoined()) {
@@ -141,8 +158,10 @@ public class ParticipationService {
             if (existing == null) {
                 p = participants.saveAndFlush(new Participant(activityId, userId, partySize, now));
             } else {
+                AttendanceStatus before = existing.getAttendanceStatus();
                 existing.rejoin(partySize, now);
                 p = participants.saveAndFlush(existing);
+                attendanceLog.record(p.getId(), before, AttendanceStatus.RSVP, Actor.USER, "rejoined");
             }
             ledger.record(activityId, partySize, LedgerReason.JOIN, p.getId());
             outbox.append(activityId, "ParticipantJoined",
@@ -169,6 +188,9 @@ public class ParticipationService {
         Instant now = Instant.now(clock);
         Activity activity = activities.findByIdForUpdate(activityId)
                 .orElseThrow(() -> new NotFoundException("Activity", activityId));
+        if (!activity.getStartsAt().isAfter(now)) {
+            throw new RuleViolationException("activity-started", "The activity has already started");
+        }
 
         var queued = waitlist.findByActivityIdAndUserId(activityId, userId)
                 .filter(w -> w.getStatus().isActive());
@@ -186,7 +208,9 @@ public class ParticipationService {
         Participant participant = participants.findByActivityIdAndUserId(activityId, userId)
                 .filter(Participant::isJoined)
                 .orElseThrow(() -> new NotFoundException("Participation of user", userId));
+        AttendanceStatus before = participant.getAttendanceStatus();
         participant.leave(now);
+        attendanceLog.record(participant.getId(), before, AttendanceStatus.CANCELLED, Actor.USER, null);
         activity.setSeatsTaken(activity.getSeatsTaken() - participant.getPartySize());
         ledger.record(activityId, -participant.getPartySize(), LedgerReason.CANCEL, participant.getId());
         outbox.append(activityId, "ParticipantLeft", Map.of("activityId", activityId, "userId", userId));

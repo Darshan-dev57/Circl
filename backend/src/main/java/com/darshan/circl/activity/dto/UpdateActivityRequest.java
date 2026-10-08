@@ -14,6 +14,7 @@ public record UpdateActivityRequest(
         @Size(max = 1000) String description,
         @Future @StartsWithinDays(30) Instant startsAt,
         @Min(15) @Max(720) Integer durationMinutes,
-        @Min(2) @Max(50) Integer capacity
+        @Min(2) @Max(50) Integer capacity,
+        @Min(0) @Max(100) Integer minReliability
 ) {
 }

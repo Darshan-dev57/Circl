@@ -21,6 +21,7 @@ public record CreateActivityRequest(
         @Min(15) @Max(720) Integer durationMinutes,
         @NotNull @Min(2) @Max(50) Integer capacity,
         @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double lat,
-        @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double lng
+        @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double lng,
+        @Min(0) @Max(100) Integer minReliability
 ) {
 }
