@@ -8,8 +8,10 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * The browser keeps the refresh token in an HttpOnly cookie so page scripts can never read it.
- * SameSite=Strict and a path limited to /api/v1/auth mean other sites cannot make the browser send it.
+ * The browser keeps the refresh token in an HttpOnly cookie, so a script running later on the page
+ * cannot read it. The web app ignores the copy in the login response body (that one is for Postman
+ * and other API clients). SameSite=Strict and a path limited to /api/v1/auth mean other sites cannot
+ * make the browser send it.
  */
 @Component
 public class RefreshCookie {

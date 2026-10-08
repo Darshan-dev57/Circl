@@ -79,7 +79,7 @@ public class SeatStream {
             } catch (NotFoundException e) {
                 // activity was deleted, nobody to tell
             } catch (JsonProcessingException | RuntimeException e) {
-                // a missed push is fine, the page also refreshes when it regains focus
+                // a missed push is fine, the next change sends the full numbers again
                 log.warn("Could not publish seats for {}: {}", id, e.getMessage());
             }
         }
