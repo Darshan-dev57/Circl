@@ -35,7 +35,6 @@ public class OutboxRelay {
     private final EventNotifier notifier;
     private final SeatStream seats;
     private final TransactionTemplate tx;
-    private final TransactionTemplate failureTx;
     private final Clock clock;
 
     public OutboxRelay(JdbcTemplate jdbc, OutboxRepository events, EventNotifier notifier,
@@ -45,7 +44,6 @@ public class OutboxRelay {
         this.notifier = notifier;
         this.seats = seats;
         this.tx = new TransactionTemplate(txManager);
-        this.failureTx = new TransactionTemplate(txManager);
         this.clock = clock;
     }
 
@@ -70,6 +68,11 @@ public class OutboxRelay {
                     seatsChanged.add(done.getAggregateId());
                 }
             } catch (RuntimeException e) {
+                if (current[0] == null) {
+                    // failed before picking an event (database trouble), try again on the next poll
+                    log.warn("Outbox poll failed: {}", e.getMessage());
+                    break;
+                }
                 // the event's transaction is rolled back by now, so its row lock is gone
                 log.warn("Outbox event {} failed: {}", current[0], e.getMessage());
                 recordFailure(current[0], e);
@@ -102,7 +105,7 @@ public class OutboxRelay {
 
     private void recordFailure(UUID id, RuntimeException e) {
         Timestamp now = Timestamp.from(Instant.now(clock));
-        failureTx.executeWithoutResult(s -> jdbc.update("""
+        tx.executeWithoutResult(s -> jdbc.update("""
                 UPDATE outbox_events
                    SET attempts = attempts + 1,
                        last_error = left(?, 500),
