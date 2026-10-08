@@ -1,6 +1,6 @@
 # Local infrastructure for Circl.
 #   docker compose up -d                 -> only Postgres and Redis (run the backend from your IDE)
-#   docker compose --profile app up -d   -> also builds and runs the backend
+#   docker compose --profile app up -d   -> also builds the backend and the frontend (http://localhost:3000)
 # Values come from .env (copy .env.example). The defaults below are for local dev only.
 name: circl
 
@@ -54,6 +54,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  frontend:
+    profiles: [app]
+    build: ./frontend
+    container_name: circl-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
