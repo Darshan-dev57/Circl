@@ -1,6 +1,7 @@
 package com.nearmeet.activity;
 
 import com.nearmeet.activity.dto.UpdateActivityRequest;
+import com.nearmeet.common.error.ForbiddenException;
 import com.nearmeet.common.error.NotFoundException;
 import com.nearmeet.common.error.RuleViolationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,15 +30,28 @@ class ActivityServiceTest {
 
     @Test
     void capacityCannotDropBelowSeatsTaken() {
-        Activity a = new Activity("Football", Category.FOOTBALL, null, 12.9, 77.6,
+        Activity a = new Activity(UUID.randomUUID(), "Football", Category.FOOTBALL, null, 12.9, 77.6,
                 Instant.now().plus(1, ChronoUnit.DAYS), 60, 10);
         a.setSeatsTaken(6);
         UUID id = UUID.randomUUID();
         when(repo.findById(id)).thenReturn(Optional.of(a));
 
-        assertThatThrownBy(() -> service.update(id, new UpdateActivityRequest(null, null, null, null, 5)))
+        assertThatThrownBy(() -> service.update(id, null, true, new UpdateActivityRequest(null, null, null, null, 5)))
                 .isInstanceOf(RuleViolationException.class)
                 .hasMessageContaining("6 seats");
+    }
+
+    @Test
+    void onlyTheHostCanEdit() {
+        UUID hostId = UUID.randomUUID();
+        Activity a = new Activity(hostId, "Coffee", Category.COFFEE, null, 12.9, 77.6,
+                Instant.now().plus(1, ChronoUnit.DAYS), 60, 4);
+        UUID id = UUID.randomUUID();
+        when(repo.findById(id)).thenReturn(Optional.of(a));
+
+        assertThatThrownBy(() -> service.cancel(id, UUID.randomUUID(), false))
+                .isInstanceOf(ForbiddenException.class);
+        service.cancel(id, hostId, false); // the host can
     }
 
     @Test
