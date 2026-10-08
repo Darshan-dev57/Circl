@@ -32,4 +32,7 @@ SELECT u.id, v.title, v.category, v.description, v.lat, v.lng, v.starts_at, v.ca
        ('BTM gully cricket', 'CRICKET', NULL, 12.9166, 77.6101, ((now() AT TIME ZONE 'Asia/Kolkata')::date + 2 + time '17:30') AT TIME ZONE 'Asia/Kolkata', 10),
        ('System design mock interviews', 'STUDY', 'One designs, one interviews, then swap.', 12.933, 77.614, ((now() AT TIME ZONE 'Asia/Kolkata')::date + 2 + time '14:00') AT TIME ZONE 'Asia/Kolkata', 4)
        ) AS v(title, category, description, lat, lng, starts_at, capacity)
- WHERE u.email = 'demo.host@circl.dev';
+ WHERE u.email = 'demo.host@circl.dev'
+   -- running the script again only adds what is missing, or what has already happened
+   AND NOT EXISTS (SELECT 1 FROM activities a
+                    WHERE a.host_id = u.id AND a.title = v.title AND a.starts_at > now());
