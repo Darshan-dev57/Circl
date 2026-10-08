@@ -1,0 +1,33 @@
+# Local infrastructure for NearMeet. Start with: docker compose up -d
+# Values come from .env (copy .env.example). The defaults below are for local dev only.
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: nearmeet-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nearmeet}
+      POSTGRES_USER: ${POSTGRES_USER:-nearmeet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nearmeet}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nearmeet} -d ${POSTGRES_DB:-nearmeet}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: nearmeet-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
