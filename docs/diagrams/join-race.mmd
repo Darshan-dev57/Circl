@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    participant A as Asha (browser)
+    participant B as Ravi (browser)
+    participant API as JoinService
+    participant DB as PostgreSQL
+
+    Note over A,B: 1 seat left, both tap Join at the same moment
+    par
+        A->>API: POST /activities/42/join<br/>Idempotency-Key: k1
+    and
+        B->>API: POST /activities/42/join<br/>Idempotency-Key: k2
+    end
+    API->>DB: BEGIN, INSERT idempotency_keys (user, k1)
+    API->>DB: BEGIN, INSERT idempotency_keys (user, k2)
+    API->>DB: (Asha) UPDATE activities SET seats_taken = seats_taken + 1<br/>WHERE id = 42 AND status = 'OPEN' AND seats_taken + 1 <= capacity
+    API->>DB: (Ravi) the same UPDATE
+    Note right of DB: Ravi's UPDATE waits on the row lock,<br/>then re-checks the WHERE on the new row
+    DB-->>API: 1 row updated (Asha)
+    API->>DB: INSERT participant, ledger +1, outbox ParticipantJoined, COMMIT
+    API-->>A: 200 JOINED, seatsLeft 0
+    DB-->>API: 0 rows updated (Ravi)
+    API->>DB: INSERT waitlist (position), outbox, COMMIT
+    API-->>B: 200 WAITLISTED, position 1
+    Note over A,DB: Asha retries after a timeout with k1: the saved response is replayed, no second seat

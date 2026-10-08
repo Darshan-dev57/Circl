@@ -1,0 +1,106 @@
+erDiagram
+    users ||--o{ activities : hosts
+    users ||--o{ refresh_tokens : owns
+    users ||--o{ participants : joins
+    users ||--o{ waitlist : waits
+    users ||--o| reliability : has
+    users ||--o{ notifications : receives
+    activities ||--o{ participants : has
+    activities ||--o{ waitlist : queues
+    activities ||--o{ capacity_ledger : logs
+    participants ||--o{ attendance_events : audits
+    participants ||--o| no_show_appeals : appeals
+
+    users {
+        uuid id PK
+        varchar email UK
+        varchar password_hash "bcrypt"
+        varchar role "PARTICIPANT HOST ADMIN"
+        int reliability_score
+    }
+    refresh_tokens {
+        uuid id PK
+        uuid user_id FK
+        varchar token_hash UK "sha-256 only"
+        timestamptz expires_at
+        timestamptz revoked_at
+    }
+    activities {
+        uuid id PK
+        uuid host_id FK
+        varchar title
+        varchar category
+        geography location "generated, GiST index"
+        timestamptz starts_at
+        int capacity "2 to 50"
+        int seats_taken "CHECK seats_taken <= capacity"
+        varchar status "OPEN CANCELLED"
+        int min_reliability
+        bigint version
+    }
+    participants {
+        uuid id PK
+        uuid activity_id FK
+        uuid user_id FK "UNIQUE with activity_id"
+        int party_size "1 to 4"
+        varchar status "JOINED LEFT"
+        varchar attendance_status
+        boolean late
+    }
+    waitlist {
+        uuid id PK
+        uuid activity_id FK
+        uuid user_id FK
+        bigint position
+        int party_size
+        varchar status "WAITING OFFERED CLAIMED EXPIRED DECLINED"
+        timestamptz claim_deadline
+    }
+    capacity_ledger {
+        bigint id PK
+        uuid activity_id FK
+        int delta "SUM = seats_taken"
+        varchar reason
+    }
+    attendance_events {
+        bigint id PK
+        uuid participant_id FK
+        varchar from_status
+        varchar to_status
+        varchar actor
+    }
+    no_show_appeals {
+        uuid id PK
+        uuid participant_id FK "UNIQUE"
+        varchar status "OPEN ACCEPTED REJECTED"
+        timestamptz appeal_closes_at
+    }
+    reliability {
+        uuid user_id PK
+        int committed
+        int checked_in
+        int no_shows
+        int score
+    }
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        varchar type
+        uuid event_id "UNIQUE with user_id"
+        timestamptz read_at
+    }
+    outbox_events {
+        uuid id PK
+        uuid aggregate_id
+        varchar type
+        jsonb payload
+        int attempts
+        timestamptz published_at
+    }
+    idempotency_keys {
+        uuid user_id PK
+        varchar idem_key PK
+        varchar request_hash
+        text response_body
+        timestamptz expires_at
+    }
