@@ -41,7 +41,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // bearer tokens only, no cookies
+                // APIs use bearer tokens; the only cookie is the SameSite=Strict refresh cookie on /api/v1/auth
+                .csrf(csrf -> csrf.disable())
                 .cors(cors -> {
                 })
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

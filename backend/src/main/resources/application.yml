@@ -42,6 +42,9 @@ circl:
     issuer: circl
     access-ttl: 15m
     refresh-ttl: 7d
+  auth:
+    # turn on (COOKIE_SECURE=true) when the app is served over https
+    cookie-secure: ${COOKIE_SECURE:false}
   checkin:
     # DEV ONLY default, set CIRCL_CHECKIN_SECRET (32+ bytes) everywhere else
     secret: ${CIRCL_CHECKIN_SECRET:dev-only-checkin-secret-change-me-0123456789}
