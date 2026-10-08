@@ -1,0 +1,1189 @@
+{
+  "info": {
+    "name": "Circl API",
+    "description": "Requests for the Circl backend. Run the Auth folder first: it creates a host and a participant and stores their tokens. Then create an activity (stores activityId) and try joining.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "hostToken",
+      "value": ""
+    },
+    {
+      "key": "participantToken",
+      "value": ""
+    },
+    {
+      "key": "hostRefresh",
+      "value": ""
+    },
+    {
+      "key": "participantRefresh",
+      "value": ""
+    },
+    {
+      "key": "activityId",
+      "value": ""
+    },
+    {
+      "key": "offerId",
+      "value": ""
+    },
+    {
+      "key": "participantId",
+      "value": ""
+    },
+    {
+      "key": "appealId",
+      "value": ""
+    },
+    {
+      "key": "checkinCode",
+      "value": ""
+    },
+    {
+      "key": "participantUserId",
+      "value": ""
+    },
+    {
+      "key": "startsAt",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// a start time two days from now for new activities",
+          "const d = new Date(Date.now() + 2 * 24 * 3600 * 1000);",
+          "pm.collectionVariables.set('startsAt', d.toISOString());"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign up a host",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"host.{{$randomInt}}@example.com\",\n  \"password\": \"correct-horse-1\",\n  \"name\": \"Kiran\",\n  \"role\": \"HOST\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 2xx\", () => pm.response.to.be.success);",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"hostToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"hostRefresh\", body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sign up a participant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user.{{$randomInt}}@example.com\",\n  \"password\": \"correct-horse-1\",\n  \"name\": \"Ananya\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 2xx\", () => pm.response.to.be.success);",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"participantToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"participantRefresh\", body.refreshToken);",
+                  "pm.collectionVariables.set(\"participantUserId\", body.user.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Works after loading scripts/demo_data.sql. Five wrong passwords block the email for 15 minutes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"demo.host@circl.dev\",\n  \"password\": \"circl-demo-pass\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Refresh (rotates the token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Send the same old refresh token twice to see reuse detection: the second call is 401 and every token of that user is revoked.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{participantRefresh}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 2xx\", () => pm.response.to.be.success);",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set(\"participantToken\", body.accessToken);",
+                  "pm.collectionVariables.set(\"participantRefresh\", body.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Log out",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{participantRefresh}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Activities",
+      "item": [
+        {
+          "name": "Create activity (host)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Sunday morning cricket\",\n  \"category\": \"CRICKET\",\n  \"description\": \"Tennis ball, bring a bat if you have one.\",\n  \"startsAt\": \"{{startsAt}}\",\n  \"durationMinutes\": 120,\n  \"capacity\": 10,\n  \"lat\": 12.9352,\n  \"lng\": 77.6245,\n  \"minReliability\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"activityId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get activity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List upcoming (paged)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities?page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Nearby (PostGIS)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/nearby?lat=12.9352&lng=77.6245&radiusKm=3&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "12.9352"
+                },
+                {
+                  "key": "lng",
+                  "value": "77.6245"
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "3"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Nearby, one category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/nearby?lat=12.9352&lng=77.6245&radiusKm=5&category=CRICKET",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "12.9352"
+                },
+                {
+                  "key": "lng",
+                  "value": "77.6245"
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "5"
+                },
+                {
+                  "key": "category",
+                  "value": "CRICKET"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Change capacity (host)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capacity\": 12\n}"
+            }
+          }
+        },
+        {
+          "name": "Participants (host only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/participants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "participants"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Activities I host",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/hosting",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "hosting"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Live seats (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/seats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "seats"
+              ]
+            },
+            "description": "Server-Sent Events. Postman shows the stream; in a terminal use: curl -N {{baseUrl}}/activities/{id}/seats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Join and waitlist",
+      "item": [
+        {
+          "name": "Join (party of 2)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/join",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "join"
+              ]
+            },
+            "description": "Send the same Idempotency-Key twice and the second response is a replay (header Idempotent-Replayed: true).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partySize\": 2\n}"
+            }
+          }
+        },
+        {
+          "name": "My status on this activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/participants/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "participants",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const s = pm.response.json();",
+                  "if (s.offerId) pm.collectionVariables.set(\"offerId\", s.offerId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/participants/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "participants",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "My open offers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "offers"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const o = pm.response.json();",
+                  "if (o.length) pm.collectionVariables.set(\"offerId\", o[0].offerId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Claim offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/offers/{{offerId}}/claim",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "offers",
+                "{{offerId}}",
+                "claim"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Decline offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/waitlist/offers/{{offerId}}/decline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "waitlist",
+                "offers",
+                "{{offerId}}",
+                "decline"
+              ]
+            }
+          }
+        },
+        {
+          "name": "My bookings (keyset paging)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/activities?when=upcoming&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "activities"
+              ],
+              "query": [
+                {
+                  "key": "when",
+                  "value": "upcoming"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const p = pm.response.json();",
+                  "if (p.items.length) pm.collectionVariables.set(\"participantId\", p.items[0].participantId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My past bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/activities?when=past&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "activities"
+              ],
+              "query": [
+                {
+                  "key": "when",
+                  "value": "past"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attendance and reliability",
+      "item": [
+        {
+          "name": "Confirm I'm coming",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "confirm"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check-in code (host, 60 s)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/checkin-code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "checkin-code"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"checkinCode\", pm.response.json().code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/checkin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "checkin"
+              ]
+            },
+            "description": "Open from 30 minutes before the start until 15 minutes after it.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{checkinCode}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Host evidence (scan failed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/attendance/{{participantUserId}}/evidence",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "attendance",
+                "{{participantUserId}}",
+                "evidence"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Phone died, I saw them play\",\n  \"markAttended\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Check-in was down (host)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/attendance/unreliable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "attendance",
+                "unreliable"
+              ]
+            },
+            "description": "Allowed from the start until scores are final (end + 2 h + 48 h). Nobody on the activity gets a no-show penalty."
+          }
+        },
+        {
+          "name": "Appeal a no-show",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/attendance/{{participantId}}/appeal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "attendance",
+                "{{participantId}}",
+                "appeal"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"I was there, the QR would not load\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"appealId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Decide an appeal (host)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/appeals/{{appealId}}/decision",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "appeals",
+                "{{appealId}}",
+                "decision"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"ACCEPT\",\n  \"note\": \"Confirmed with the group\"\n}"
+            }
+          }
+        },
+        {
+          "name": "My reliability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/reliability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "reliability"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Free now",
+      "item": [
+        {
+          "name": "I'm free for 60 minutes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"BADMINTON\",\n  \"minutes\": 60,\n  \"lat\": 12.9352,\n  \"lng\": 77.6245\n}"
+            }
+          }
+        },
+        {
+          "name": "Who is free nearby",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/availability/nearby?lat=12.9352&lng=77.6245&category=BADMINTON&radiusKm=3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability",
+                "nearby"
+              ],
+              "query": [
+                {
+                  "key": "lat",
+                  "value": "12.9352"
+                },
+                {
+                  "key": "lng",
+                  "value": "77.6245"
+                },
+                {
+                  "key": "category",
+                  "value": "BADMINTON"
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "Distances come back rounded (~1 km), never exact. Limited to 10 searches per 5 minutes."
+          }
+        },
+        {
+          "name": "Stop being free",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/availability/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "availability",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Latest notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{participantToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/me/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "me",
+                "notifications"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clean up",
+      "item": [
+        {
+          "name": "Cancel activity (host)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hostToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
