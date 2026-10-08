@@ -71,6 +71,7 @@ public class AttendanceService {
     public CheckinTokens.Issued checkinCode(UUID activityId, UUID hostId) {
         Activity activity = activity(activityId);
         requireHost(activity, hostId);
+        requireOpen(activity);
         return tokens.issue(activityId);
     }
 
@@ -78,6 +79,7 @@ public class AttendanceService {
     public Participant checkIn(UUID activityId, UUID userId, String code) {
         Instant now = Instant.now(clock);
         Activity activity = activity(activityId);
+        requireOpen(activity);
         if (!tokens.isValid(code, activityId)) {
             throw new RuleViolationException("invalid-checkin-code", "Check-in code is invalid or expired");
         }
@@ -157,6 +159,12 @@ public class AttendanceService {
     private static void requireHost(Activity activity, UUID userId) {
         if (!activity.isHostedBy(userId)) {
             throw new ForbiddenException("Only the host can do this");
+        }
+    }
+
+    private static void requireOpen(Activity activity) {
+        if (!activity.isOpen()) {
+            throw new RuleViolationException("activity-not-open", "This activity was cancelled");
         }
     }
 }

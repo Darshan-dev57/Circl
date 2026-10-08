@@ -128,6 +128,19 @@ class AttendanceFlowIT {
     }
 
     @Test
+    void noCheckInOnACancelledActivity() throws Exception {
+        startsInMinutes(10);
+        String code = code();
+        mvc.perform(delete("/api/v1/activities/{id}", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isNoContent());
+
+        checkIn(alice, code).andExpect(status().isUnprocessableEntity());
+        mvc.perform(get("/api/v1/activities/{id}/checkin-code", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isUnprocessableEntity());
+        assertThat(attendance(alice)).isEqualTo("RSVP");
+    }
+
+    @Test
     void cannotLeaveAfterTheStart() throws Exception {
         startsInMinutes(-5);
         mvc.perform(delete("/api/v1/activities/{id}/participants/me", activityId).header("Authorization", alice.bearer()))
