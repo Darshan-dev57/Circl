@@ -28,6 +28,16 @@ spring:
     problemdetails:
       enabled: true
 
+nearmeet:
+  jwt:
+    # DEV ONLY default so the app starts on a laptop. Set NEARMEET_JWT_SECRET (32+ bytes) everywhere else.
+    secret: ${NEARMEET_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    issuer: nearmeet
+    access-ttl: 15m
+    refresh-ttl: 7d
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+
 server:
   port: ${PORT:8080}
   error:

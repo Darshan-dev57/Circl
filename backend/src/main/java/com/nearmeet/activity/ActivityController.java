@@ -4,6 +4,7 @@ import com.nearmeet.activity.dto.ActivityDetail;
 import com.nearmeet.activity.dto.ActivitySummary;
 import com.nearmeet.activity.dto.CreateActivityRequest;
 import com.nearmeet.activity.dto.UpdateActivityRequest;
+import com.nearmeet.common.web.CurrentUser;
 import com.nearmeet.common.web.PageResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -11,6 +12,9 @@ import jakarta.validation.constraints.Min;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,8 +42,10 @@ public class ActivityController {
     }
 
     @PostMapping
-    public ResponseEntity<ActivityDetail> create(@Valid @RequestBody CreateActivityRequest request) {
-        ActivityDetail created = service.create(request);
+    @PreAuthorize("hasAnyRole('HOST', 'ADMIN')")
+    public ResponseEntity<ActivityDetail> create(@AuthenticationPrincipal Jwt jwt,
+                                                 @Valid @RequestBody CreateActivityRequest request) {
+        ActivityDetail created = service.create(CurrentUser.id(jwt), request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(created.id()).toUri();
         return ResponseEntity.created(location).body(created);
@@ -59,13 +65,14 @@ public class ActivityController {
     }
 
     @PatchMapping("/{id}")
-    public ActivityDetail update(@PathVariable UUID id, @Valid @RequestBody UpdateActivityRequest request) {
-        return service.update(id, request);
+    public ActivityDetail update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                 @Valid @RequestBody UpdateActivityRequest request) {
+        return service.update(id, CurrentUser.id(jwt), CurrentUser.isAdmin(jwt), request);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> cancel(@PathVariable UUID id) {
-        service.cancel(id);
+    public ResponseEntity<Void> cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        service.cancel(id, CurrentUser.id(jwt), CurrentUser.isAdmin(jwt));
         return ResponseEntity.noContent().build();
     }
 }

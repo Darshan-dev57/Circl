@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record ActivityDetail(
         UUID id,
+        UUID hostId,
         String title,
         Category category,
         String description,

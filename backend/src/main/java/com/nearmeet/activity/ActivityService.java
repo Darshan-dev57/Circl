@@ -4,6 +4,7 @@ import com.nearmeet.activity.dto.ActivityDetail;
 import com.nearmeet.activity.dto.ActivitySummary;
 import com.nearmeet.activity.dto.CreateActivityRequest;
 import com.nearmeet.activity.dto.UpdateActivityRequest;
+import com.nearmeet.common.error.ForbiddenException;
 import com.nearmeet.common.error.NotFoundException;
 import com.nearmeet.common.error.RuleViolationException;
 import com.nearmeet.common.text.TextSanitizer;
@@ -30,8 +31,9 @@ public class ActivityService {
     }
 
     @Transactional
-    public ActivityDetail create(CreateActivityRequest req) {
+    public ActivityDetail create(UUID hostId, CreateActivityRequest req) {
         Activity activity = new Activity(
+                hostId,
                 TextSanitizer.clean(req.title()),
                 req.category(),
                 TextSanitizer.plainText(req.description()),
@@ -58,8 +60,9 @@ public class ActivityService {
     }
 
     @Transactional
-    public ActivityDetail update(UUID id, UpdateActivityRequest req) {
+    public ActivityDetail update(UUID id, UUID userId, boolean admin, UpdateActivityRequest req) {
         Activity activity = find(id);
+        requireHost(activity, userId, admin);
         if (!activity.isOpen()) {
             throw new RuleViolationException("activity-not-open", "A cancelled activity cannot be edited");
         }
@@ -86,8 +89,17 @@ public class ActivityService {
     }
 
     @Transactional
-    public void cancel(UUID id) {
-        find(id).cancel();
+    public void cancel(UUID id, UUID userId, boolean admin) {
+        Activity activity = find(id);
+        requireHost(activity, userId, admin);
+        activity.cancel();
+    }
+
+    /** ownership is checked per resource: being a HOST does not let you edit someone else's activity */
+    private static void requireHost(Activity activity, UUID userId, boolean admin) {
+        if (!admin && !activity.isHostedBy(userId)) {
+            throw new ForbiddenException("Only the host can change this activity");
+        }
     }
 
     private Activity find(UUID id) {
