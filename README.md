@@ -327,7 +327,7 @@ check-in and appeal requests only succeed when an activity is actually full, abo
 cd frontend && npm run lint && npm run build
 ```
 
-**127 tests**: 9 for the seat simulator, 32 unit tests and 86 integration tests that run against real PostgreSQL + PostGIS and Redis started by Testcontainers. No H2, because H2 has no PostGIS and locks rows differently.
+**130 tests**: 9 for the seat simulator, 32 unit tests and 89 integration tests that run against real PostgreSQL + PostGIS and Redis started by Testcontainers. No H2, because H2 has no PostGIS and locks rows differently.
 
 What the integration tests cover, among other things: 60 parallel HTTP joins for 10 seats,
 50 threads for the last seat under each strategy, idempotent replays, waitlist offers racing with
