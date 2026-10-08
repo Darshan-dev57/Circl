@@ -27,6 +27,9 @@ public class Participant {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
+    @Column(name = "party_size", nullable = false)
+    private int partySize = 1;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private ParticipantStatus status;
@@ -43,9 +46,10 @@ public class Participant {
     protected Participant() {
     }
 
-    public Participant(UUID activityId, UUID userId, Instant joinedAt) {
+    public Participant(UUID activityId, UUID userId, int partySize, Instant joinedAt) {
         this.activityId = activityId;
         this.userId = userId;
+        this.partySize = partySize;
         this.status = ParticipantStatus.JOINED;
         this.joinedAt = joinedAt;
     }
@@ -54,7 +58,8 @@ public class Participant {
         return status == ParticipantStatus.JOINED;
     }
 
-    public void rejoin(Instant when) {
+    public void rejoin(int partySize, Instant when) {
+        this.partySize = partySize;
         status = ParticipantStatus.JOINED;
         joinedAt = when;
         leftAt = null;
@@ -68,6 +73,7 @@ public class Participant {
     public UUID getId() { return id; }
     public UUID getActivityId() { return activityId; }
     public UUID getUserId() { return userId; }
+    public int getPartySize() { return partySize; }
     public ParticipantStatus getStatus() { return status; }
     public Instant getJoinedAt() { return joinedAt; }
     public Instant getLeftAt() { return leftAt; }

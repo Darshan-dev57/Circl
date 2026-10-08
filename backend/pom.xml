@@ -20,6 +20,7 @@
     <properties>
         <java.version>21</java.version>
         <jsoup.version>1.23.2</jsoup.version>
+        <shedlock.version>7.10.1</shedlock.version>
     </properties>
 
     <dependencies>
@@ -59,6 +60,16 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
         <dependency>
             <groupId>org.jsoup</groupId>

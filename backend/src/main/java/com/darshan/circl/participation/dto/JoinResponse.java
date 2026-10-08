@@ -8,6 +8,7 @@ import java.util.UUID;
 public record JoinResponse(
         UUID activityId,
         JoinOutcome status,
+        int partySize,
         Long waitlistPosition,
         int seatsLeft
 ) {

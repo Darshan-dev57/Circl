@@ -14,6 +14,8 @@ import com.darshan.circl.participation.dto.JoinResponse.JoinOutcome;
 import com.darshan.circl.participation.engine.JoinStrategy;
 import com.darshan.circl.participation.engine.SeatAllocator;
 import com.darshan.circl.participation.idempotency.IdempotencyService;
+import com.darshan.circl.participation.ledger.CapacityLedger;
+import com.darshan.circl.participation.ledger.LedgerReason;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +47,8 @@ public class ParticipationService {
     private final ParticipantRepository participants;
     private final WaitlistRepository waitlist;
     private final IdempotencyService idempotency;
+    private final CapacityLedger ledger;
+    private final WaitlistOffers offers;
     private final Outbox outbox;
     private final Map<JoinStrategy, SeatAllocator> allocators = new EnumMap<>(JoinStrategy.class);
     private final JoinStrategy defaultStrategy;
@@ -52,7 +56,8 @@ public class ParticipationService {
     private final Clock clock;
 
     public ParticipationService(ActivityRepository activities, ParticipantRepository participants,
-                                WaitlistRepository waitlist, IdempotencyService idempotency, Outbox outbox,
+                                WaitlistRepository waitlist, IdempotencyService idempotency,
+                                CapacityLedger ledger, WaitlistOffers offers, Outbox outbox,
                                 List<SeatAllocator> allocators,
                                 @Value("${circl.join.strategy:CONDITIONAL_UPDATE}") JoinStrategy defaultStrategy,
                                 PlatformTransactionManager txManager, Clock clock) {
@@ -60,6 +65,8 @@ public class ParticipationService {
         this.participants = participants;
         this.waitlist = waitlist;
         this.idempotency = idempotency;
+        this.ledger = ledger;
+        this.offers = offers;
         this.outbox = outbox;
         allocators.forEach(a -> this.allocators.put(a.strategy(), a));
         this.defaultStrategy = defaultStrategy;
@@ -67,21 +74,21 @@ public class ParticipationService {
         this.clock = clock;
     }
 
-    public JoinResult join(UUID activityId, UUID userId, String idempotencyKey) {
-        return join(activityId, userId, idempotencyKey, defaultStrategy);
+    public JoinResult join(UUID activityId, UUID userId, int partySize, String idempotencyKey) {
+        return join(activityId, userId, partySize, idempotencyKey, defaultStrategy);
     }
 
     /**
      * Each attempt is its own transaction. Only the optimistic strategy ever needs
      * a second attempt (someone bumped the activity version between our read and write).
      */
-    public JoinResult join(UUID activityId, UUID userId, String idempotencyKey, JoinStrategy strategy) {
+    public JoinResult join(UUID activityId, UUID userId, int partySize, String idempotencyKey, JoinStrategy strategy) {
         SeatAllocator allocator = allocators.get(strategy);
-        String requestHash = TokenService.sha256(activityId.toString());
+        String requestHash = TokenService.sha256(activityId + "|" + partySize);
         for (int attempt = 1; ; attempt++) {
             try {
                 int attemptNo = attempt;
-                return tx.execute(status -> joinOnce(activityId, userId, idempotencyKey, requestHash, allocator, attemptNo));
+                return tx.execute(status -> joinOnce(activityId, userId, partySize, idempotencyKey, requestHash, allocator, attemptNo));
             } catch (OptimisticLockingFailureException e) {
                 if (attempt >= MAX_ATTEMPTS) {
                     log.warn("Join on {} gave up after {} optimistic conflicts", activityId, attempt);
@@ -98,7 +105,7 @@ public class ParticipationService {
         }
     }
 
-    private JoinResult joinOnce(UUID activityId, UUID userId, String key, String requestHash,
+    private JoinResult joinOnce(UUID activityId, UUID userId, int partySize, String key, String requestHash,
                                 SeatAllocator allocator, int attempt) {
         var replay = idempotency.begin(userId, key, requestHash, JoinResponse.class);
         if (replay.isPresent()) {
@@ -119,25 +126,34 @@ public class ParticipationService {
         if (existing != null && existing.isJoined()) {
             throw new ConflictException("already-joined", "You already joined this activity");
         }
-        if (waitlist.findByActivityIdAndUserId(activityId, userId).isPresent()) {
-            throw new ConflictException("already-waitlisted", "You are already on the waitlist");
+        var queued = waitlist.findByActivityIdAndUserId(activityId, userId);
+        if (queued.isPresent()) {
+            if (queued.get().getStatus().isActive()) {
+                throw new ConflictException("already-waitlisted", "You are already on the waitlist");
+            }
+            waitlist.delete(queued.get()); // an old expired or declined offer
+            waitlist.flush();
         }
 
         JoinResponse response;
-        if (allocator.tryTakeSeats(activityId, 1)) {
+        if (allocator.tryTakeSeats(activityId, partySize)) {
+            Participant p;
             if (existing == null) {
-                participants.saveAndFlush(new Participant(activityId, userId, now));
+                p = participants.saveAndFlush(new Participant(activityId, userId, partySize, now));
             } else {
-                existing.rejoin(now);
-                participants.saveAndFlush(existing);
+                existing.rejoin(partySize, now);
+                p = participants.saveAndFlush(existing);
             }
-            outbox.append(activityId, "ParticipantJoined", Map.of("activityId", activityId, "userId", userId));
-            response = new JoinResponse(activityId, JoinOutcome.JOINED, null, seatsLeft(activityId));
+            ledger.record(activityId, partySize, LedgerReason.JOIN, p.getId());
+            outbox.append(activityId, "ParticipantJoined",
+                    Map.of("activityId", activityId, "userId", userId, "partySize", partySize));
+            response = new JoinResponse(activityId, JoinOutcome.JOINED, partySize, null, seatsLeft(activityId));
         } else {
-            WaitlistEntry entry = waitlist.saveAndFlush(new WaitlistEntry(activityId, userId, now));
+            WaitlistEntry entry = waitlist.saveAndFlush(new WaitlistEntry(activityId, userId, partySize, now));
             long rank = waitlist.rankOf(activityId, entry.getPosition());
-            outbox.append(activityId, "ParticipantWaitlisted", Map.of("activityId", activityId, "userId", userId));
-            response = new JoinResponse(activityId, JoinOutcome.WAITLISTED, rank, 0);
+            outbox.append(activityId, "ParticipantWaitlisted",
+                    Map.of("activityId", activityId, "userId", userId, "partySize", partySize));
+            response = new JoinResponse(activityId, JoinOutcome.WAITLISTED, partySize, rank, seatsLeft(activityId));
         }
 
         idempotency.complete(userId, key, 200, response);
@@ -145,8 +161,8 @@ public class ParticipationService {
     }
 
     /**
-     * Leaving frees the seat and hands it to the first person on the waitlist, all in one
-     * transaction with the activity row locked, so a freed seat cannot be handed out twice.
+     * Leaving frees the seats and offers them to the waitlist in the same transaction,
+     * with the activity row locked, so one freed seat can never be offered twice.
      */
     @Transactional
     public void leave(UUID activityId, UUID userId) {
@@ -154,10 +170,16 @@ public class ParticipationService {
         Activity activity = activities.findByIdForUpdate(activityId)
                 .orElseThrow(() -> new NotFoundException("Activity", activityId));
 
-        var queued = waitlist.findByActivityIdAndUserId(activityId, userId);
+        var queued = waitlist.findByActivityIdAndUserId(activityId, userId)
+                .filter(w -> w.getStatus().isActive());
         if (queued.isPresent()) {
-            waitlist.delete(queued.get());
-            outbox.append(activityId, "WaitlistLeft", Map.of("activityId", activityId, "userId", userId));
+            WaitlistEntry entry = queued.get();
+            if (entry.getStatus() == WaitlistStatus.OFFERED) {
+                offers.decline(entry.getId(), userId);
+            } else {
+                waitlist.delete(entry);
+                outbox.append(activityId, "WaitlistLeft", Map.of("activityId", activityId, "userId", userId));
+            }
             return;
         }
 
@@ -165,31 +187,10 @@ public class ParticipationService {
                 .filter(Participant::isJoined)
                 .orElseThrow(() -> new NotFoundException("Participation of user", userId));
         participant.leave(now);
-        activity.setSeatsTaken(activity.getSeatsTaken() - 1);
+        activity.setSeatsTaken(activity.getSeatsTaken() - participant.getPartySize());
+        ledger.record(activityId, -participant.getPartySize(), LedgerReason.CANCEL, participant.getId());
         outbox.append(activityId, "ParticipantLeft", Map.of("activityId", activityId, "userId", userId));
-
-        if (activity.isOpen() && activity.getStartsAt().isAfter(now)) {
-            promoteFromWaitlist(activity, now);
-        }
-    }
-
-    private void promoteFromWaitlist(Activity activity, Instant now) {
-        for (WaitlistEntry next : waitlist.findByActivityIdOrderByPosition(activity.getId())) {
-            if (activity.seatsLeft() < 1) {
-                return;
-            }
-            Participant p = participants.findByActivityIdAndUserId(activity.getId(), next.getUserId())
-                    .orElse(null);
-            if (p == null) {
-                participants.save(new Participant(activity.getId(), next.getUserId(), now));
-            } else {
-                p.rejoin(now);
-            }
-            waitlist.delete(next);
-            activity.setSeatsTaken(activity.getSeatsTaken() + 1);
-            outbox.append(activity.getId(), "WaitlistPromoted",
-                    Map.of("activityId", activity.getId(), "userId", next.getUserId()));
-        }
+        offers.offerFreedSeats(activity);
     }
 
     private int seatsLeft(UUID activityId) {
