@@ -9,15 +9,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import jakarta.servlet.http.Cookie;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -156,5 +160,33 @@ class AuthApiIT {
                 .andExpect(status().isNoContent());
         mvc.perform(post("/api/v1/auth/refresh").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void browserCanRefreshWithTheHttpOnlyCookie() throws Exception {
+        Users.TestUser u = Users.participant(mvc);
+        Cookie sent = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + u.email() + "\",\"password\":\"correct-horse-1\"}"))
+                .andExpect(header().string("Set-Cookie", allOf(containsString("circl_refresh="),
+                        containsString("HttpOnly"), containsString("SameSite=Strict"), containsString("Path=/api/v1/auth"))))
+                .andReturn().getResponse().getCookie("circl_refresh");
+
+        Cookie rotated = mvc.perform(post("/api/v1/auth/refresh").cookie(sent))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andReturn().getResponse().getCookie("circl_refresh");
+        assertThat(rotated.getValue()).isNotEqualTo(sent.getValue());
+
+        // the old cookie was rotated away, so sending it again is reuse
+        mvc.perform(post("/api/v1/auth/refresh").cookie(sent)).andExpect(status().isUnauthorized());
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(rotated))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+    }
+
+    @Test
+    void refreshWithoutAnyTokenIs401() throws Exception {
+        mvc.perform(post("/api/v1/auth/refresh")).andExpect(status().isUnauthorized());
     }
 }
