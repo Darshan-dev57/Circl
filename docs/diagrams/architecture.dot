@@ -1,0 +1,36 @@
+digraph circl {
+    graph [rankdir=TB, fontname="Helvetica", fontsize=13, bgcolor="white", pad=0.4, nodesep=0.5, ranksep=0.55, newrank=true];
+    node  [shape=box, style="rounded,filled", fillcolor="#fffdf9", color="#1c1a17", fontname="Helvetica", fontsize=12, margin="0.18,0.10"];
+    edge  [color="#5a544b", fontname="Helvetica", fontsize=10, fontcolor="#5a544b", arrowsize=0.7];
+
+    browser [label="Browser\nReact + Vite + Leaflet", fillcolor="#fbe9df", color="#c4410e"];
+    proxy   [label="nginx\nserves the app,\nproxies /api"];
+
+    subgraph cluster_app {
+        label="Spring Boot 3  ·  Java 21"; style="rounded,filled"; fillcolor="#f4f1ea"; color="#cfc7b7"; fontcolor="#1c1a17";
+        security    [label="Security filters\nJWT, request id"];
+        controllers [label="Controllers\n/api/v1/..."];
+        services    [label="Services\njoin engine, waitlist offers,\nattendance, reliability"];
+        data        [label="Spring Data JPA\n+ JdbcTemplate"];
+        jobs        [label="Scheduled jobs (ShedLock)\noutbox relay, offer expiry,\nfinalizer, reminders"];
+        sse         [label="SeatStream\nSseEmitters"];
+        security -> controllers -> services -> data;
+        jobs -> services [style=dashed];
+        {rank=same; services; jobs;}
+        {rank=same; data; sse;}
+    }
+
+    pg    [label="PostgreSQL 16 + PostGIS\nactivities, participants, waitlist,\nledger, outbox, notifications", shape=cylinder];
+    redis [label="Redis 7\nnearby cache, free-now,\nrate limits, seat channel", shape=cylinder];
+
+    browser -> proxy [label="JSON + Bearer"];
+    proxy -> security;
+    sse -> proxy [label="Server-Sent Events", style=dashed];
+    data -> pg;
+    jobs -> pg [label="poll outbox\nSKIP LOCKED"];
+    services -> redis [label="cache, limits"];
+    jobs -> redis [label="PUBLISH seats"];
+    redis -> sse [label="SUBSCRIBE", style=dashed];
+
+    {rank=same; pg; redis;}
+}

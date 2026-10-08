@@ -1,0 +1,26 @@
+sequenceDiagram
+    autonumber
+    participant J as Joined user
+    participant API as Circl API
+    participant DB as PostgreSQL
+    participant R as Background jobs
+    participant W as Next in line (party of 2)
+
+    J->>API: DELETE /activities/42/participants/me
+    API->>DB: participant LEFT, seats_taken - 2, ledger -2
+    API->>DB: first WAITING party that fits gets OFFERED,<br/>seats held, claim_deadline = now + 15 min
+    API->>DB: outbox WaitlistOffered, COMMIT
+    R->>DB: poll outbox (FOR UPDATE SKIP LOCKED)
+    R->>DB: notification "2 seats opened up, claim before 7:45 pm"
+    R-->>W: seat count over SSE, page shows the offer and a countdown
+    alt claims in time
+        W->>API: POST /waitlist/offers/{id}/claim
+        API->>DB: UPDATE waitlist SET status = CLAIMED<br/>WHERE id = ? AND status = OFFERED AND claim_deadline > now()
+        DB-->>API: 1 row
+        API->>DB: INSERT participant (party of 2), ledger CLAIM, COMMIT
+        API-->>W: 200 JOINED
+    else lets it expire
+        R->>DB: offer expiry job (ShedLock): status OFFERED to EXPIRED
+        R->>DB: seats go to the next party that fits, new 15 min offer
+    end
+    Note over API,DB: claim and expiry both use "UPDATE ... WHERE status = OFFERED",<br/>so only one of them can win

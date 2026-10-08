@@ -1,0 +1,22 @@
+sequenceDiagram
+    autonumber
+    participant U as Someone joins
+    participant I1 as App instance 1
+    participant DB as PostgreSQL
+    participant RD as Redis channel circl:seats
+    participant I2 as App instance 2
+    participant V as Viewer's browser
+
+    V->>I2: GET /activities/42/seats (EventSource)
+    I2-->>V: event: seats {capacity 10, seatsTaken 6}
+    U->>I1: POST /activities/42/join
+    I1->>DB: seat UPDATE + outbox row, one transaction
+    loop every 2 s
+        I1->>DB: outbox relay picks the event
+    end
+    I1->>DB: read fresh seat numbers (after commit)
+    I1->>RD: PUBLISH {seatsTaken 7}
+    RD-->>I1: message
+    RD-->>I2: message
+    I2-->>V: event: seats {seatsTaken 7}
+    Note over V: a dot on the ring fills in
