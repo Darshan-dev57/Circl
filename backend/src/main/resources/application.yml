@@ -19,6 +19,11 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 500ms
   jackson:
     deserialization:
       fail-on-unknown-properties: true
@@ -43,6 +48,13 @@ circl:
   attendance:
     finalize-after-end: 2h
     appeal-window: 48h
+  availability:
+    max-minutes: 180
+    max-radius-km: 5
+    min-reliability-to-search: 40
+    searches-per-window: 10
+    search-window: 5m
+    max-jump-km: 5
   join:
     strategy: ${CIRCL_JOIN_STRATEGY:CONDITIONAL_UPDATE}
   cors:
