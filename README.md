@@ -227,14 +227,37 @@ docker compose up -d                        # only Postgres and Redis
 cd frontend && npm install && npm run dev   # app on :5173, /api is proxied to :8080
 ```
 
-### Windows notes
+### On Windows (PowerShell)
 
-- Use **PowerShell** and Docker Desktop with the WSL 2 backend.
-- Use `mvnw.cmd` instead of `./mvnw`: `.\mvnw.cmd -pl backend spring-boot:run`
-- PowerShell has no `<` redirect, so load demo data with:
-  `Get-Content scripts\demo_data.sql | docker exec -i circl-postgres psql -U circl -d circl`
-- If port 5432 is taken by a local PostgreSQL, stop that service or change the left side of `"5432:5432"` in `docker-compose.yml`.
-- Clone with `git config --global core.autocrlf input` (or keep the repo's `.gitattributes`) so `mvnw` keeps LF line endings.
+Start Docker Desktop first (WSL 2 backend) and wait until it shows "Engine running". Then run these one line at a time:
+
+```powershell
+git clone https://github.com/Darshan-dev57/Circl.git
+cd Circl
+docker compose --profile app up -d --build
+Get-Content scripts\demo_data.sql | docker exec -i circl-postgres psql -U circl -d circl
+```
+
+Development mode, with the frontend in a second PowerShell window:
+
+```powershell
+docker compose up -d
+.\mvnw.cmd -pl backend spring-boot:run
+```
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Tests: `.\mvnw.cmd verify` (Docker Desktop must be running, the integration tests start their own containers).
+
+- PowerShell has no `<` redirect, which is why the SQL file is piped in with `Get-Content`.
+- Windows PowerShell 5.1 does not understand `&&`, so run the commands as separate lines like above.
+- `mvnw.cmd` needs JDK 21: `java -version` should say 21. If Maven picks another JDK, set `JAVA_HOME` to the JDK 21 folder.
+- If port 5432, 6379, 8080 or 3000 is already taken (often a local PostgreSQL service on 5432), stop that service or change the left side of the port in `docker-compose.yml`, e.g. `"5433:5432"`. For development mode then also set `$env:DB_URL="jdbc:postgresql://localhost:5433/circl"` before starting the backend.
+- Line endings: `.gitattributes` keeps `mvnw` LF and `mvnw.cmd` CRLF, so the default Git for Windows settings work.
 
 ### Configuration
 
