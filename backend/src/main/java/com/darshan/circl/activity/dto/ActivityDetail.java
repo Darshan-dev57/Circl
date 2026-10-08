@@ -20,6 +20,7 @@ public record ActivityDetail(
         int seatsTaken,
         int seatsLeft,
         ActivityStatus status,
+        int minReliability,
         Instant createdAt
 ) {
 }

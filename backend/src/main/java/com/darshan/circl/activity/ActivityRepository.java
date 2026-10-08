@@ -31,7 +31,10 @@ public interface ActivityRepository extends JpaRepository<Activity, UUID> {
     @Query("select a from Activity a where a.id = :id")
     Optional<Activity> findByIdForUpdate(@Param("id") UUID id);
 
-    @Query("select a.hostId as hostId, a.status as status, a.startsAt as startsAt from Activity a where a.id = :id")
+    @Query("""
+            select a.hostId as hostId, a.status as status, a.startsAt as startsAt, a.minReliability as minReliability
+              from Activity a where a.id = :id
+            """)
     Optional<ActivityGate> findGateById(@Param("id") UUID id);
 
     @Query(value = """
