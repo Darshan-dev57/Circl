@@ -12,6 +12,8 @@ public record ActivitySummary(
         String title,
         Category category,
         Instant startsAt,
+        double lat,
+        double lng,
         int capacity,
         int seatsLeft,
         Double distanceM
