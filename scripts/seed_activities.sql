@@ -1,12 +1,12 @@
 -- Seeds a demo host and N activities spread around five Bengaluru areas.
--- Usage: docker exec -i nearmeet-postgres psql -U nearmeet -d nearmeet -v n=100000 < scripts/seed_activities.sql
+-- Usage: docker exec -i circl-postgres psql -U circl -d circl -v n=100000 < scripts/seed_activities.sql
 \if :{?n}
 \else
 \set n 100000
 \endif
 
 INSERT INTO users (email, name, password_hash, role)
-VALUES ('seed-host@nearmeet.dev', 'Seed Host',
+VALUES ('seed-host@circl.dev', 'Seed Host',
         -- bcrypt of "seed-host-pass", only for local demo data
         '$2a$10$GpmlVridk.3.NladF6/ggOby.S1o8a.kXQ2ConzJDRUMaGH779Sxa', 'HOST')
 ON CONFLICT (email) DO NOTHING;
@@ -18,7 +18,7 @@ WITH areas(name, lat, lng) AS (
            ('Jayanagar', 12.9250, 77.5938),
            ('Whitefield', 12.9698, 77.7500)
 ), host AS (
-    SELECT id FROM users WHERE email = 'seed-host@nearmeet.dev'
+    SELECT id FROM users WHERE email = 'seed-host@circl.dev'
 ), cats AS (
     SELECT ARRAY['CRICKET', 'BADMINTON', 'FOOTBALL', 'COFFEE', 'TREK', 'STUDY'] AS c
 )
