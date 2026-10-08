@@ -19,6 +19,8 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  cache:
+    type: ${CACHE_TYPE:redis}
   data:
     redis:
       host: ${REDIS_HOST:localhost}

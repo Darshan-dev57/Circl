@@ -39,11 +39,15 @@ class NearbySearchIT {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    org.springframework.cache.CacheManager caches;
+
     Users.TestUser host;
 
     @BeforeEach
     void setUp() throws Exception {
         jdbc.update("DELETE FROM activities");
+        caches.getCache("nearby").clear();
         host = Users.host(mvc);
         create("Cricket in Cubbon", "CRICKET", 12.9763, 77.5929);      // 0 km
         create("Coffee on Church St", "COFFEE", 12.9750, 77.6050);     // ~1.3 km
@@ -66,7 +70,7 @@ class NearbySearchIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].title").value("Cricket in Cubbon"))
-                .andExpect(jsonPath("$[0].distanceM", closeTo(0.0, 1.0)))
+                .andExpect(jsonPath("$[0].distanceM", closeTo(0.0, 100.0))) // search point is rounded to ~110 m
                 .andExpect(jsonPath("$[1].title").value("Coffee on Church St"))
                 .andExpect(jsonPath("$[1].distanceM", closeTo(1300.0, 150.0)));
     }
@@ -85,6 +89,7 @@ class NearbySearchIT {
 
     @Test
     void cancelledAndPastActivitiesAreHidden() throws Exception {
+        caches.getCache("nearby").clear();
         jdbc.update("UPDATE activities SET status = 'CANCELLED' WHERE title = 'Cricket in Cubbon'");
         jdbc.update("UPDATE activities SET starts_at = now() - interval '1 hour' WHERE title = 'Coffee on Church St'");
         mvc.perform(get("/api/v1/activities/nearby")
