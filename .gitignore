@@ -1,0 +1,19 @@
+# build
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# ide
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# env / secrets
+.env
+*.env.local
+
+# frontend
+node_modules/
+dist/
