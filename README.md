@@ -70,7 +70,7 @@ the right number get in, nobody is double booked, and the rest go to a fair wait
 A plain layered Spring Boot app (controller, service, repository) with two stores:
 
 - **PostgreSQL + PostGIS** is the source of truth for everything that matters: seats, participants, the waitlist, the ledger and the outbox.
-- **Redis** holds only things that are fine to lose: the nearby cache, free-now posts, rate-limit counters and the pub/sub channel for live seats. If Redis is down, nearby search still works (it goes straight to Postgres) and login fails closed.
+- **Redis** holds only things that are fine to lose: the nearby cache, free-now posts, rate-limit counters and the pub/sub channel for live seats. If Redis is down, nearby search still works (it goes straight to Postgres) and login fails closed with a `503`.
 
 Background work runs as `@Scheduled` jobs. ShedLock makes sure only one instance runs the offer-expiry,
 finalizer and reminder jobs at a time; the outbox relay uses `FOR UPDATE SKIP LOCKED` so several
@@ -118,8 +118,9 @@ key gets the saved response; the same key with a different body is rejected; a k
 gets `409`.
 
 The [`seat-simulator`](seat-simulator) module shows the same race in plain Java first
-(`ExecutorService` + `CountDownLatch`): with no lock, 100 threads booked **35** of 10 seats; `synchronized`,
-`AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10.
+(`ExecutorService` + `CountDownLatch`): in one run with no lock, 100 threads booked **35** of 10 seats (the exact number
+changes every run); `synchronized`, `AtomicInteger` CAS and `ReentrantLock` all stop at exactly 10.
+After a build you can run it yourself: `java -cp seat-simulator/target/classes com.darshan.circl.sim.SeatSimulator`.
 
 ## Waitlist offers
 
@@ -177,7 +178,7 @@ relative numbers, not production promises.
 | 60 people join 10 seats at once (HTTP) | **10 joined, 50 waitlisted, 0 overbooked** |
 | 50 threads for the last seat, 20 rounds, per strategy | conditional update p50 85 ms / pessimistic 96 ms / optimistic 57 ms with 143 retries, **0 overbooked** in all three |
 | 10 parallel requests with one `Idempotency-Key` | 1 participant row, 1 seat taken |
-| Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked |
+| Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (one run, it changes every run) |
 | Join to live seat update in the browser | about 1.5 s |
 
 ## Tech choices
@@ -270,6 +271,8 @@ Tests: `.\mvnw.cmd verify` (Docker Desktop must be running, the integration test
 | `COOKIE_SECURE` | `false` | set `true` behind HTTPS |
 | `CIRCL_JOIN_STRATEGY` | `CONDITIONAL_UPDATE` | or `PESSIMISTIC`, `OPTIMISTIC` |
 | `CACHE_TYPE` | `redis` | `none` turns the nearby cache off |
+| `CORS_ORIGINS` | `http://localhost:5173` | browser origins allowed to call the API directly |
+| `PORT` | `8080` | |
 
 Copy `.env.example` to `.env` for Docker Compose. No real secret is committed.
 
@@ -277,7 +280,8 @@ Copy `.env.example` to `.env` for Docker Compose. No real secret is committed.
 
 Everything is under `/api/v1`. Errors are [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457)
 with a list of field errors for validation failures. A ready-made Postman collection is in
-[`docs/postman`](docs/postman/circl.postman_collection.json).
+[`docs/postman`](docs/postman/circl.postman_collection.json). Run it top to bottom; the offer,
+check-in and appeal requests only succeed when an activity is actually full, about to start or finished.
 
 | Method | Path | Who | What |
 |---|---|---|---|
@@ -323,7 +327,7 @@ with a list of field errors for validation failures. A ready-made Postman collec
 cd frontend && npm run lint && npm run build
 ```
 
-**125 tests**: 9 for the seat simulator, 30 unit tests and 86 integration tests that run against real PostgreSQL + PostGIS and Redis started by Testcontainers. No H2, because H2 has no PostGIS and locks rows differently.
+**127 tests**: 9 for the seat simulator, 32 unit tests and 86 integration tests that run against real PostgreSQL + PostGIS and Redis started by Testcontainers. No H2, because H2 has no PostGIS and locks rows differently.
 
 What the integration tests cover, among other things: 60 parallel HTTP joins for 10 seats,
 50 threads for the last seat under each strategy, idempotent replays, waitlist offers racing with
