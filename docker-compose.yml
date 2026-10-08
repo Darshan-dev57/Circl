@@ -4,6 +4,8 @@ services:
   postgres:
     image: postgis/postgis:16-3.4
     container_name: nearmeet-postgres
+    # JIT compile time was bigger than the whole nearby query
+    command: ["postgres", "-c", "jit=off"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nearmeet}
       POSTGRES_USER: ${POSTGRES_USER:-nearmeet}

@@ -20,7 +20,7 @@ public interface ActivityRepository extends JpaRepository<Activity, UUID> {
               AND a.starts_at > :now
               AND (CAST(:category AS varchar) IS NULL OR a.category = CAST(:category AS varchar))
               AND ST_DWithin(a.location, ST_MakePoint(:lng, :lat)::geography, :radiusM)
-            ORDER BY distanceM, a.id
+            ORDER BY a.location <-> ST_MakePoint(:lng, :lat)::geography, a.id
             LIMIT :limit
             """, nativeQuery = true)
     List<NearbyActivityRow> findNearby(@Param("lat") double lat,
