@@ -7,6 +7,7 @@ import com.darshan.circl.activity.dto.UpdateActivityRequest;
 import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
+import com.darshan.circl.common.outbox.Outbox;
 import com.darshan.circl.common.text.TextSanitizer;
 import com.darshan.circl.config.CacheConfig;
 import org.springframework.cache.annotation.CacheEvict;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,13 +30,15 @@ public class ActivityService {
     private final ActivityRepository activities;
     private final ActivityMapper mapper;
     private final ApplicationEventPublisher events;
+    private final Outbox outbox;
     private final Clock clock;
 
     public ActivityService(ActivityRepository activities, ActivityMapper mapper, ApplicationEventPublisher events,
-                           Clock clock) {
+                           Outbox outbox, Clock clock) {
         this.activities = activities;
         this.mapper = mapper;
         this.events = events;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -132,6 +136,7 @@ public class ActivityService {
         Activity activity = find(id);
         requireHost(activity, userId, admin);
         activity.cancel();
+        outbox.append(id, "ActivityCancelled", Map.of("activityId", id));
     }
 
     /** ownership is checked per resource: being a HOST does not let you edit someone else's activity */
