@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -57,6 +58,17 @@ public class ActivityService {
                 ? activities.findByStatusAndStartsAtAfter(ActivityStatus.OPEN, now, pageable)
                 : activities.findByStatusAndCategoryAndStartsAtAfter(ActivityStatus.OPEN, category, now, pageable);
         return page.map(mapper::toSummary);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ActivitySummary> nearby(double lat, double lng, double radiusKm, Category category, int limit) {
+        return activities.findNearby(lat, lng, radiusKm * 1000, category == null ? null : category.name(),
+                        Instant.now(clock), limit)
+                .stream()
+                .map(r -> new ActivitySummary(r.getId(), r.getTitle(), Category.valueOf(r.getCategory()),
+                        r.getStartsAt(), r.getCapacity(), r.getCapacity() - r.getSeatsTaken(),
+                        Math.round(r.getDistanceM() * 10) / 10.0))
+                .toList();
     }
 
     @Transactional
