@@ -211,6 +211,11 @@ export default function ActivityPage() {
     if (seats?.status === 'CANCELLED') reload()
   }, [seats?.status, reload])
 
+  // a seat moving might mean an offer for me, or that my waitlist place changed
+  useEffect(() => {
+    if (user && seats) reloadStatus()
+  }, [user, seats, reloadStatus])
+
   if (error) {
     return (
       <main className="page">
