@@ -1,0 +1,18 @@
+flowchart LR
+    subgraph tx["One database transaction"]
+        direction TB
+        A["POST /activities/{id}/join<br/>seat UPDATE + participant row"] --> B[("outbox_events<br/>new row")]
+    end
+
+    B --> C["OutboxRelay<br/>every 2 s, one at a time (ShedLock)<br/>SELECT ... FOR UPDATE SKIP LOCKED"]
+    C -- "send, key = activityId<br/>wait for broker ack" --> K[["Kafka topic<br/>circl.activity-events<br/>3 partitions"]]
+    C -- "ack received" --> P["mark row published_at"]
+    C -. "broker down / no ack" .-> R["attempts + 1, retry later<br/>5 s, 10 s, ... parked after 5"]
+
+    K --> N["group circl-notifications<br/>NotificationListener"]
+    K --> S["group circl-live-seats<br/>SeatEventListener"]
+
+    N --> DB[("notifications<br/>UNIQUE (event_id, user_id)<br/>ON CONFLICT DO NOTHING")]
+    S --> RS["Redis PUBLISH<br/>then SSE to browsers"]
+
+    N -. "fails 3 times" .-> DLT[["circl.activity-events-dlt"]]
