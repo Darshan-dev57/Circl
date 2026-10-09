@@ -28,8 +28,8 @@ export default function Shell() {
         </nav>
         <div className="topbar__end">
           {user?.role === 'HOST' && (
-            <Link to="/host/new" className="button button--small">
-              <Plus size={16} aria-hidden="true" /> New activity
+            <Link to="/host/new" className="button button--small" aria-label="New activity">
+              <Plus size={16} aria-hidden="true" /> <span className="topbar__label">New activity</span>
             </Link>
           )}
           {user ? (
