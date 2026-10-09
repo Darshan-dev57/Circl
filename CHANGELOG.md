@@ -4,7 +4,18 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-10-09
+### Added
+- Apache Kafka (single KRaft node) in Docker Compose and in the integration tests.
+- The outbox relay publishes events to the `circl.activity-events` topic, keyed by activity id, and marks a row published only after the broker acks it. If Kafka is down the row stays and is retried with backoff.
+- Kafka consumers for in-app notifications (`circl-notifications`) and live seat counts (`circl-live-seats`). Both are safe to run twice for the same event.
+- Dead letter topic `circl.activity-events-dlt` for records that keep failing.
+- Tests for the outbox to Kafka round trip, duplicate delivery, a broker outage and the dead letter topic.
+- `KAFKA_BOOTSTRAP_SERVERS` setting.
+
 ### Fixed
+- Reconfirm reminders failed when the scheduler ran them (no transaction around the scheduled call).
 - Login and other Redis-backed endpoints answer `503` instead of `500` when Redis stops responding.
 - Signing up with a password over 72 bytes (for example 30 Kannada letters) returns `422` instead of `500`.
 - Editing an activity with a title of only spaces is rejected with `400`.
@@ -15,7 +26,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The outbox relay stops the batch when the poll itself fails, instead of logging the same error up to 100 times.
 
 ### Changed
-- README: Windows steps as plain PowerShell lines, more configuration variables, test count.
+- Notifications and live seat counts are handled by Kafka consumers instead of inside the outbox relay.
+- README rewritten: overview, key features, architecture with Kafka, engineering highlights, configuration and testing sections.
+- README Windows steps are plain PowerShell lines.
 
 ## [0.3.0] - 2026-10-09
 ### Added
@@ -54,7 +67,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Join engine with `Idempotency-Key`, three seat strategies (conditional update, pessimistic, optimistic) and a waitlist.
 - Concurrency tests: 60 parallel joins for 10 seats and 50 threads for the last seat per strategy.
 
-[Unreleased]: https://github.com/Darshan-dev57/Circl/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Darshan-dev57/Circl/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Darshan-dev57/Circl/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Darshan-dev57/Circl/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Darshan-dev57/Circl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Darshan-dev57/Circl/releases/tag/v0.1.0
