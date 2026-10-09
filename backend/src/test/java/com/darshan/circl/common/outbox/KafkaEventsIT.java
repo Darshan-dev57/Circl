@@ -25,6 +25,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,6 +48,9 @@ class KafkaEventsIT {
     KafkaTemplate<String, ActivityEvent> kafka;
 
     @Autowired
+    OutboxRepository outbox;
+
+    @Autowired
     ConsumerFactory<String, ActivityEvent> consumers;
 
     /** reads the whole topic from the start with a throwaway consumer group */
@@ -59,6 +64,63 @@ class KafkaEventsIT {
             });
         }
         return found;
+    }
+
+    private void join(TestUser u, UUID activity) throws Exception {
+        mvc.perform(post("/api/v1/activities/{id}/join", activity).header("Authorization", u.bearer())
+                .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isOk());
+    }
+
+    private int notificationsFor(TestUser u) {
+        return jdbc.queryForObject("SELECT count(*) FROM notifications WHERE user_id = ?", Integer.class, u.id());
+    }
+
+    @Test
+    void outboxRowGoesThroughKafkaAndBecomesOneNotification() throws Exception {
+        TestUser host = Users.host(mvc);
+        UUID activity = Activities.create(mvc, host, 3);
+        join(Users.participant(mvc), activity);
+        join(Users.participant(mvc), activity);
+        relay.relayBatch(500);
+
+        UUID lastEvent = jdbc.queryForObject("""
+                SELECT id FROM outbox_events WHERE aggregate_id = ? ORDER BY created_at DESC LIMIT 1
+                """, UUID.class, activity);
+        List<ConsumerRecord<String, ActivityEvent>> mine = readAll(TOPIC, lastEvent).stream()
+                .filter(r -> r.value() != null && activity.equals(r.value().activityId()))
+                .toList();
+
+        // keyed by activity, so both joins sit on one partition in the order they happened
+        assertThat(mine).hasSize(2);
+        assertThat(mine).allMatch(r -> r.key().equals(activity.toString()));
+        assertThat(mine.get(0).partition()).isEqualTo(mine.get(1).partition());
+        assertThat(mine.get(0).offset()).isLessThan(mine.get(1).offset());
+
+        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 2);
+    }
+
+    @Test
+    void theSameEventDeliveredTwiceGivesOneNotification() throws Exception {
+        TestUser host = Users.host(mvc);
+        UUID activity = Activities.create(mvc, host, 3);
+        join(Users.participant(mvc), activity);
+        relay.relayBatch(500);
+        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 1);
+
+        // what a redelivery looks like: same event id, same key
+        OutboxEvent row = outbox.findAll().stream()
+                .filter(e -> e.getAggregateId().equals(activity))
+                .findFirst().orElseThrow();
+        kafka.send(TOPIC, activity.toString(), ActivityEvent.from(row)).get();
+        kafka.send(TOPIC, activity.toString(), ActivityEvent.from(row)).get();
+
+        // a new event behind the duplicates on the same partition; once it is handled, so are they
+        join(Users.participant(mvc), activity);
+        relay.relayBatch(500);
+        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 2);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications WHERE event_id = ?", Integer.class, row.getId()))
+                .isEqualTo(1);
     }
 
     @Test
