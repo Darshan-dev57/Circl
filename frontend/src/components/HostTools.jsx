@@ -2,7 +2,7 @@ import QRCode from 'qrcode'
 import { RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import { countdown } from '../format'
+import { countdown, when } from '../format'
 import { useApi, useNow } from '../hooks'
 
 const ATTENDANCE = {
@@ -14,7 +14,19 @@ const ATTENDANCE = {
   CANCELLED: 'Left',
 }
 
-function CheckinCode({ activityId }) {
+// same window as the server: circl.checkin.opens-before and grace-after-start
+const OPENS_BEFORE_MS = 30 * 60 * 1000
+const GRACE_MS = 15 * 60 * 1000
+
+function timeUntil(ms) {
+  const mins = Math.ceil(ms / 60000)
+  if (mins < 60) return `${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 48) return `${hours}h ${mins % 60}m`
+  return `${Math.floor(hours / 24)} days`
+}
+
+function CheckinCode({ activityId, startsAt }) {
   const now = useNow(1000)
   const [code, setCode] = useState(null)
   const [qr, setQr] = useState(null)
@@ -46,7 +58,28 @@ function CheckinCode({ activityId }) {
   }, [code, load])
 
   const msLeft = code ? new Date(code.expiresAt).getTime() - now : 0
+  const start = new Date(startsAt).getTime()
+  const opensAt = start - OPENS_BEFORE_MS
 
+  if (now > start + GRACE_MS) {
+    return (
+      <div className="host__block">
+        <h3>Check-in</h3>
+        <p className="muted small">Check-in closed {GRACE_MS / 60000} minutes after the start.</p>
+      </div>
+    )
+  }
+  if (now < opensAt) {
+    return (
+      <div className="host__block">
+        <h3>Check-in</h3>
+        <p className="muted small">
+          Opens at {when(new Date(opensAt).toISOString())} (in {timeUntil(opensAt - now)}). The code changes every minute, so a screenshot is no use later.
+        </p>
+        <button className="button button--quiet button--small" disabled>Show check-in code</button>
+      </div>
+    )
+  }
   if (!code) {
     return (
       <div className="host__block">
@@ -161,7 +194,7 @@ export default function HostTools({ activity, seats, onChange }) {
         </div>
       )}
 
-      {!cancelled && <CheckinCode activityId={activity.id} />}
+      {!cancelled && <CheckinCode activityId={activity.id} startsAt={activity.startsAt} />}
 
       {!cancelled && !started && (
         <>
