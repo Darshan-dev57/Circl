@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth-context'
 import ActivityMap from '../components/ActivityMap'
+import PlaceSearch from '../components/PlaceSearch'
 import SeatRing from '../components/SeatRing'
 import { CATEGORIES, distance, seatsText, when } from '../format'
 import { useApi, useDebounced } from '../hooks'
@@ -58,6 +59,7 @@ export default function Explore() {
   const [selected, setSelected] = useState(null)
   const [locating, setLocating] = useState(false)
   const [locateError, setLocateError] = useState(null)
+  const [area, setArea] = useState(null)
 
   const searchAt = useDebounced(center, 350)
   const path = `/activities/nearby?lat=${searchAt.lat.toFixed(3)}&lng=${searchAt.lng.toFixed(3)}&radiusKm=${radius}&limit=50${category ? `&category=${category}` : ''}`
@@ -84,6 +86,7 @@ export default function Explore() {
         const here = { lat: pos.coords.latitude, lng: pos.coords.longitude }
         setYou([here.lat, here.lng])
         setRecenter([here.lat, here.lng])
+        setArea(null)
         setCenter(here)
         setLocating(false)
       },
@@ -95,12 +98,20 @@ export default function Explore() {
     )
   }
 
+  function goTo(place) {
+    setRecenter([place.lat, place.lng, Math.min(place.zoom, 14)])
+    setCenter({ lat: place.lat, lng: place.lng })
+    setArea(place.name)
+    setSelected(null)
+  }
+
   return (
     <main className="explore">
       <aside className="explore__panel">
         <div className="explore__head">
-          <h1>Happening near you</h1>
+          <h1>{area ? `Happening around ${area}` : 'Happening near you'}</h1>
           <p className="muted">Games, study groups and plans within {radius} km of the map centre. Seats go fast.</p>
+          <PlaceSearch onPick={goTo} label="Search an area or city" placeholder="Search an area or city, e.g. Indiranagar" />
         </div>
 
         <div className="filters" role="group" aria-label="Category">
