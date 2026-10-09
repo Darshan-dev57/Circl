@@ -131,7 +131,7 @@ time {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   align-items: center;
   gap: 28px;
@@ -622,7 +622,9 @@ time {
   box-shadow: 0 0 0 6px rgb(47 111 222 / 20%);
 }
 
+/* leaflet's panes and controls go up to z-index 1000; keep them inside the map */
 .leaflet-container {
+  isolation: isolate;
   background: var(--sunk);
   font: inherit;
 }
@@ -634,6 +636,88 @@ time {
 
 .leaflet-control-attribution {
   font-size: 0.6875rem;
+}
+
+/* place search */
+
+.place-search {
+  position: relative;
+}
+
+.place-search__icon {
+  position: absolute;
+  top: 13px;
+  left: 12px;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+.place-search input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px 9px 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+
+.place-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.place-search__list {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.place-search__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.place-search__item svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
+
+.place-search__item span {
+  display: grid;
+  min-width: 0;
+}
+
+.place-search__item small {
+  overflow: hidden;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-search__item:hover,
+.place-search__item--active {
+  background: var(--sunk);
+}
+
+.place-search__status {
+  padding: 8px 10px;
+  color: var(--ink-2);
 }
 
 /* seat ring */
