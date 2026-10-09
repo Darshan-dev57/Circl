@@ -206,6 +206,8 @@ Treat these as relative comparisons rather than production figures.
 | 50 threads racing for the last seat, 20 rounds per strategy | conditional update p50 85 ms, pessimistic 96 ms, optimistic 57 ms with 143 retries; **0 overbooked** in all three |
 | 10 parallel requests sharing one `Idempotency-Key` | 1 participant row, 1 seat taken |
 | Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (varies per run) |
+| Join to live seat update in the browser (through Kafka and nginx) | 1.1 to 1.8 s, median 1.2 s over 7 joins; most of it is the 2 s outbox poll |
+| Kafka stopped during a leave, then restarted | the event stayed in the outbox and was delivered 6 s after the broker came back |
 
 ## Tech stack and rationale
 
@@ -253,7 +255,7 @@ docker exec -i circl-postgres psql -U circl -d circl < scripts/demo_data.sql
 Sign in as the demo host `demo.host@circl.dev` / `circl-demo-pass`, or create an account.
 
 > [!NOTE]
-> The first build downloads the base images and dependencies and takes a few minutes. Kafka needs about 20 seconds to report healthy; the backend starts after it.
+> The first build downloads the base images and dependencies and takes a few minutes (about 2 minutes on the test machine). The backend waits for PostgreSQL, Redis and Kafka to report healthy before it starts.
 
 ### Development mode
 
