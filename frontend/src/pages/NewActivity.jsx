@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import ActivityMap from '../components/ActivityMap'
+import PlaceSearch from '../components/PlaceSearch'
 import { CATEGORIES } from '../format'
 
 const START = [12.9352, 77.6245]
@@ -31,16 +32,28 @@ export default function NewActivity() {
     minReliability: 0,
   })
   const [spot, setSpot] = useState(null)
+  const [flyTo, setFlyTo] = useState(null)
+  const [venue, setVenue] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
-  const onPick = useCallback((latlng) => setSpot([latlng.lat, latlng.lng]), [])
+  const onPick = useCallback((latlng) => {
+    setSpot([latlng.lat, latlng.lng])
+    setVenue(null)
+  }, [])
+
+  function onPlace(place) {
+    setSpot([place.lat, place.lng])
+    setFlyTo([place.lat, place.lng, Math.max(place.zoom, 16)])
+    setVenue(place.name)
+    setError(null)
+  }
 
   async function submit(e) {
     e.preventDefault()
     if (!spot) {
-      setError('Tap the map to drop a pin where people should meet.')
+      setError('Search the venue or tap the map to drop a pin where people should meet.')
       return
     }
     setBusy(true)
@@ -128,13 +141,21 @@ export default function NewActivity() {
       </form>
 
       <div className="new-activity__map">
-        <p className="map-hint">{spot ? 'Pin dropped. Tap again to move it.' : 'Tap the map where people should meet.'}</p>
+        <PlaceSearch onPick={onPlace} label="Search the venue" placeholder="Search the venue, e.g. Cubbon Park" />
+        <p className="map-hint">
+          {venue
+            ? `Pin set at ${venue}. Drag it or tap the map to adjust.`
+            : spot
+              ? 'Pin dropped. Drag it or tap again to move it.'
+              : 'Search the venue above, or tap the map where people should meet.'}
+        </p>
         <ActivityMap
           className="pick-map"
           center={START}
           zoom={14}
           onPick={onPick}
-          pins={spot ? [{ id: 'new', lat: spot[0], lng: spot[1], label: '', variant: 'selected', title: 'Meeting point' }] : []}
+          recenter={flyTo}
+          pins={spot ? [{ id: 'new', lat: spot[0], lng: spot[1], label: '', variant: 'selected', title: 'Meeting point', draggable: true }] : []}
         />
       </div>
     </main>
