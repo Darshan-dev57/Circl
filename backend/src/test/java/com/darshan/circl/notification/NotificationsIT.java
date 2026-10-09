@@ -116,7 +116,7 @@ class NotificationsIT {
         join(a, activity);
         jdbc.update("UPDATE activities SET starts_at = now() + interval '90 minutes' WHERE id = ?", activity);
 
-        assertThat(reminders.sendDue()).isGreaterThanOrEqualTo(1);
+        reminders.run(); // the way the scheduler calls it
         assertThat(reminders.sendDue()).isZero();
         drainOutbox();
         eventually(() -> mvc.perform(get("/api/v1/me/notifications").header("Authorization", a.bearer()))
