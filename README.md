@@ -1,7 +1,7 @@
 <h1 align="center">Circl</h1>
 
 <p align="center">
-  <strong>A location-aware meetup platform: discover activities nearby and claim a seat, with a booking engine that never overbooks.</strong>
+  <strong>Find small activities happening near you and join them in one tap.</strong>
 </p>
 
 <p align="center">
@@ -19,14 +19,20 @@
 
 ## Overview
 
-Circl lets people post small, time-boxed activities (a badminton doubles game at 6:30, a study group,
-a weekend trek) with a place, a start time and a fixed number of seats. Others find them on a map,
-sorted by distance, and join with one tap.
+Circl helps people do things together nearby. Anyone can host a small, time-boxed activity, such as a
+badminton doubles game at 6:30, a five-a-side after work, a study group at the library cafe, a weekend
+trek, or a coffee walk, with a place, a start time and a fixed number of seats. Others see what is on
+around them on a map, sorted by distance and filterable by category, and join with one tap.
 
-The core engineering problem is contention for the last seat. When many users request the same seat at
-the same instant, Circl admits exactly as many as there is capacity, never double-books, and places
-everyone else on a fair waitlist with a time-boxed claim. Domain events (joins, cancellations, offers)
-are published reliably through a transactional outbox to Apache Kafka and consumed idempotently.
+For participants: live seat counts, a waitlist that holds a freed seat for you for 15 minutes, group
+bookings of up to four, in-app notifications and a reliability score that rewards showing up. For hosts:
+a participant list, a rotating QR code for check-in at the venue, and a no-show process with appeals.
+A "free now" status lets people say they are available for the next couple of hours without revealing
+their exact location.
+
+Under the hood it is a Spring Boot service on PostgreSQL + PostGIS, Redis and Apache Kafka, built with
+production habits: correct seat accounting under concurrency, reliable event delivery through a
+transactional outbox, idempotent consumers, and integration tests on real containers.
 
 **Stack:** Java 21 · Spring Boot 3.5 · PostgreSQL 16 + PostGIS · Apache Kafka (KRaft) · Redis 7 · React 19 + Vite + Leaflet · Docker Compose · Testcontainers · GitHub Actions
 
@@ -50,7 +56,7 @@ are published reliably through a transactional outbox to Apache Kafka and consum
 | Area | Capability |
 |---|---|
 | Discovery | Radius search with PostGIS (`ST_DWithin` + GiST index, KNN ordering by distance), category filters, Redis-cached results |
-| Booking | Overbooking-proof joins via a single conditional `UPDATE`, `Idempotency-Key` support, group bookings of up to 4 that succeed or wait together |
+| Booking | One-tap joins, group bookings of up to 4 that succeed or wait together, safe retries with `Idempotency-Key` |
 | Waitlist | Freed seats are held for the first party that fits, with a 15-minute claim window before moving on |
 | Auditability | Append-only capacity ledger: `SUM(delta)` always equals `seats_taken` |
 | Attendance | Rotating HMAC-signed QR check-in, an attendance state machine, no-show appeals within 48 hours |
@@ -98,11 +104,11 @@ coordinated across instances with ShedLock.
 
 ## Engineering highlights
 
-### Overbooking-proof join engine
+### Join engine
 
 ![Join race](docs/images/join-race.png)
 
-The seat check and the seat reservation are a single atomic statement:
+Seats are the one thing that must never be oversold when many people tap join at the same instant, so the seat check and the seat reservation are a single atomic statement:
 
 ```sql
 UPDATE activities
@@ -202,8 +208,8 @@ Treat these as relative comparisons rather than production figures.
 |---|---|
 | Nearby search, 100k activities, 3 km radius | 72 to 85 ms without an index; about **8 ms** with a GiST index and KNN ordering |
 | Nearby search under load (k6, 50 virtual users, 30 s) | uncached: p95 363 ms, 294 req/s; Redis-cached: **p95 34 ms, 3014 req/s**, 0 errors |
-| 60 concurrent HTTP joins for 10 seats | **10 joined, 50 waitlisted, 0 overbooked** |
-| 50 threads racing for the last seat, 20 rounds per strategy | conditional update p50 85 ms, pessimistic 96 ms, optimistic 57 ms with 143 retries; **0 overbooked** in all three |
+| 60 concurrent HTTP joins for 10 seats | 10 joined, 50 waitlisted, 0 overbooked |
+| 50 threads racing for the last seat, 20 rounds per strategy | conditional update p50 85 ms, pessimistic 96 ms, optimistic 57 ms with 143 retries; 0 overbooked in all three |
 | 10 parallel requests sharing one `Idempotency-Key` | 1 participant row, 1 seat taken |
 | Seat simulator, 100 threads, 10 seats, no lock | 35 booked, 25 overbooked (varies per run) |
 | Join to live seat update in the browser (through Kafka and nginx) | 1.1 to 1.8 s, median 1.2 s over 7 joins; most of it is the 2 s outbox poll |
