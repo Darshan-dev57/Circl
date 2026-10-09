@@ -33,6 +33,7 @@ public class ReconfirmReminderJob {
 
     @Scheduled(fixedDelayString = "PT1M")
     @SchedulerLock(name = "reconfirm-reminders", lockAtMostFor = "PT5M")
+    @Transactional // calling sendDue() from here skips its proxy, so the transaction has to start here
     public void run() {
         sendDue();
     }

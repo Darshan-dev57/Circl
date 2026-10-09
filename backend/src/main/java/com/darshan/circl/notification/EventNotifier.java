@@ -1,6 +1,6 @@
 package com.darshan.circl.notification;
 
-import com.darshan.circl.common.outbox.OutboxEvent;
+import com.darshan.circl.common.outbox.ActivityEvent;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +11,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** Turns outbox events into in-app notifications for the people who care about them. */
+/**
+ * Turns activity events into in-app notifications for the people who care about them.
+ * Safe to call twice for the same event: notifications are unique per (event, user).
+ */
 @Component
 public class EventNotifier {
 
@@ -25,10 +28,10 @@ public class EventNotifier {
         this.jdbc = jdbc;
     }
 
-    public void handle(OutboxEvent event) {
-        Map<String, Object> data = event.getPayload();
-        UUID activityId = event.getAggregateId();
-        switch (event.getType()) {
+    public void handle(ActivityEvent event) {
+        Map<String, Object> data = event.payload();
+        UUID activityId = event.activityId();
+        switch (event.type()) {
             case "ParticipantJoined" -> toHost(event, activityId, "PARTICIPANT_JOINED",
                     nameOf(data.get("userId")) + " joined " + titleOf(activityId));
             case "ParticipantLeft" -> toHost(event, activityId, "PARTICIPANT_LEFT",
@@ -39,16 +42,16 @@ public class EventNotifier {
                 String deadline = TIME.format(Instant.parse((String) data.get("claimDeadline")));
                 notifications.notify(uuid(data.get("userId")), "WAITLIST_OFFER",
                         seats + " opened up for " + titleOf(activityId) + ". Claim before " + deadline + ".",
-                        activityId, event.getId());
+                        activityId, event.eventId());
             }
             case "WaitlistOfferExpired" -> notifications.notify(uuid(data.get("userId")), "OFFER_EXPIRED",
-                    "Your offer for " + titleOf(activityId) + " expired and went to the next person.", activityId, event.getId());
+                    "Your offer for " + titleOf(activityId) + " expired and went to the next person.", activityId, event.eventId());
             case "ReconfirmRequested" -> notifications.notify(uuid(data.get("userId")), "RECONFIRM",
-                    titleOf(activityId) + " starts in 2 hours. Still coming? Tap confirm.", activityId, event.getId());
+                    titleOf(activityId) + " starts in 2 hours. Still coming? Tap confirm.", activityId, event.eventId());
             case "ActivityCancelled" -> {
                 String message = titleOf(activityId) + " was cancelled by the host.";
                 for (UUID user : participantsOf(activityId)) {
-                    notifications.notify(user, "ACTIVITY_CANCELLED", message, activityId, event.getId());
+                    notifications.notify(user, "ACTIVITY_CANCELLED", message, activityId, event.eventId());
                 }
             }
             default -> {
@@ -57,9 +60,9 @@ public class EventNotifier {
         }
     }
 
-    private void toHost(OutboxEvent event, UUID activityId, String type, String message) {
+    private void toHost(ActivityEvent event, UUID activityId, String type, String message) {
         UUID host = jdbc.queryForObject("SELECT host_id FROM activities WHERE id = ?", UUID.class, activityId);
-        notifications.notify(host, type, message, activityId, event.getId());
+        notifications.notify(host, type, message, activityId, event.eventId());
     }
 
     private String titleOf(UUID activityId) {
