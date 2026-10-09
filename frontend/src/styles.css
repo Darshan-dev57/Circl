@@ -131,7 +131,7 @@ time {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   align-items: center;
   gap: 28px;
@@ -622,7 +622,9 @@ time {
   box-shadow: 0 0 0 6px rgb(47 111 222 / 20%);
 }
 
+/* leaflet's panes and controls go up to z-index 1000; keep them inside the map */
 .leaflet-container {
+  isolation: isolate;
   background: var(--sunk);
   font: inherit;
 }
