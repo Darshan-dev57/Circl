@@ -13,7 +13,7 @@
 
     <groupId>com.darshan.circl</groupId>
     <artifactId>circl</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
     <name>circl</name>
     <description>Find small activities happening near you and join them</description>
 

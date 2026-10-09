@@ -7,7 +7,7 @@
     <!-- only here so "mvn verify" from the root builds both modules -->
     <groupId>com.darshan.circl</groupId>
     <artifactId>circl-root</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
     <packaging>pom</packaging>
 
     <modules>
