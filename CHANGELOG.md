@@ -21,7 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Editing an activity with a title of only spaces is rejected with `400`.
 - Check-in and the check-in code are refused for a cancelled activity.
 - The host's "check-in was down" button appears once the activity starts, without a page reload.
-- The demo data script can be run twice without duplicating activities.
+- The sample data script can be run twice without duplicating activities.
 - `backend/mvnw.cmd` no longer shows up as modified right after cloning.
 - The outbox relay stops the batch when the poll itself fails, instead of logging the same error up to 100 times.
 
@@ -41,7 +41,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - My bookings with keyset paging, my status on an activity, and a list of activities I host.
 - Host can report that check-in was down, so nobody gets a no-show penalty.
 - Login limit: 5 wrong passwords block the email for 15 minutes.
-- Swagger UI, Dockerfiles and a compose profile that runs the whole app, Maven wrapper, demo data script, Postman collection, diagrams and screenshots.
+- Swagger UI, Dockerfiles and a compose profile that runs the whole app, Maven wrapper, sample data script, Postman collection, diagrams and screenshots.
 
 ### Changed
 - The refresh token is also sent as an HttpOnly, SameSite=Strict cookie; the body still works for API clients.

@@ -1,4 +1,4 @@
--- Seeds a demo host and N activities spread around five Bengaluru areas.
+-- Seeds a sample host and N activities spread around five Bengaluru areas.
 -- Usage: docker exec -i circl-postgres psql -U circl -d circl -v n=100000 < scripts/seed_activities.sql
 \if :{?n}
 \else
@@ -7,7 +7,7 @@
 
 INSERT INTO users (email, name, password_hash, role)
 VALUES ('seed-host@circl.dev', 'Seed Host',
-        -- bcrypt of "seed-host-pass", only for local demo data
+        -- bcrypt of "seed-host-pass", only for local sample data
         '$2a$10$GpmlVridk.3.NladF6/ggOby.S1o8a.kXQ2ConzJDRUMaGH779Sxa', 'HOST')
 ON CONFLICT (email) DO NOTHING;
 
@@ -26,7 +26,7 @@ INSERT INTO activities (host_id, title, category, description, latitude, longitu
 SELECT host.id,
        cats.c[1 + (g % 6)] || ' meetup #' || g,
        cats.c[1 + (g % 6)],
-       'seeded demo activity',
+       'seeded sample activity',
        a.lat + (random() - 0.5) * 0.3,   -- about +-16 km around the area
        a.lng + (random() - 0.5) * 0.3,
        now() + (random() * interval '20 days') + interval '1 hour',

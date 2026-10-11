@@ -1,7 +1,7 @@
 -- A small, realistic set of activities around Koramangala, Indiranagar and HSR for trying the app.
--- Usage (Linux/macOS): docker exec -i circl-postgres psql -U circl -d circl < scripts/demo_data.sql
--- Usage (PowerShell):  Get-Content scripts/demo_data.sql | docker exec -i circl-postgres psql -U circl -d circl
--- Demo host login: demo.host@circl.dev / circl-demo-pass (local only)
+-- Usage (Linux/macOS): docker exec -i circl-postgres psql -U circl -d circl < scripts/sample_data.sql
+-- Usage (PowerShell):  Get-Content scripts/sample_data.sql | docker exec -i circl-postgres psql -U circl -d circl
+-- Sample host login: demo.host@circl.dev / circl-demo-pass (local only)
 
 INSERT INTO users (email, name, password_hash, role)
 VALUES ('demo.host@circl.dev', 'Kiran', '$2a$10$OqjDO5xxUgV2r3qBqBgSh.D.6aYPuYGxd2gW7prXMn1fON4hxhNFC', 'HOST')
