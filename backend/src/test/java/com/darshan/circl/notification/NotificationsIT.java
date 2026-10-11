@@ -146,7 +146,10 @@ class NotificationsIT {
         assertThat(reminders.sendDue()).isZero();
         drainOutbox();
         eventually(() -> mvc.perform(get("/api/v1/me/notifications").header("Authorization", a.bearer()))
-                .andExpect(jsonPath("$[0].type").value("RECONFIRM")));
+                .andExpect(jsonPath("$[0].type").value("RECONFIRM"))
+                .andExpect(jsonPath("$[0].message").value(org.hamcrest.Matchers.containsString(" starts at ")))
+                .andExpect(jsonPath("$[0].message").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("2 hours")))));
     }
 
     @Test
