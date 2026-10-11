@@ -34,6 +34,8 @@ public class EventNotifier {
         switch (event.type()) {
             case "ParticipantJoined" -> toHost(event, activityId, "PARTICIPANT_JOINED",
                     nameOf(data.get("userId")) + " joined " + titleOf(activityId));
+            case "WaitlistClaimed" -> toHost(event, activityId, "PARTICIPANT_JOINED",
+                    nameOf(data.get("userId")) + " joined " + titleOf(activityId) + " from the waitlist");
             case "ParticipantLeft" -> toHost(event, activityId, "PARTICIPANT_LEFT",
                     nameOf(data.get("userId")) + " left " + titleOf(activityId));
             case "WaitlistOffered" -> {
@@ -47,7 +49,8 @@ public class EventNotifier {
             case "WaitlistOfferExpired" -> notifications.notify(uuid(data.get("userId")), "OFFER_EXPIRED",
                     "Your offer for " + titleOf(activityId) + " expired and went to the next person.", activityId, event.eventId());
             case "ReconfirmRequested" -> notifications.notify(uuid(data.get("userId")), "RECONFIRM",
-                    titleOf(activityId) + " starts in 2 hours. Still coming? Tap confirm.", activityId, event.eventId());
+                    titleOf(activityId) + " starts at " + TIME.format(startOf(activityId)) + ". Still coming? Tap confirm.",
+                    activityId, event.eventId());
             case "ActivityCancelled" -> {
                 String message = titleOf(activityId) + " was cancelled by the host.";
                 for (UUID user : participantsOf(activityId)) {
@@ -67,6 +70,11 @@ public class EventNotifier {
 
     private String titleOf(UUID activityId) {
         return jdbc.queryForObject("SELECT title FROM activities WHERE id = ?", String.class, activityId);
+    }
+
+    private Instant startOf(UUID activityId) {
+        return jdbc.queryForObject("SELECT starts_at FROM activities WHERE id = ?", java.sql.Timestamp.class, activityId)
+                .toInstant();
     }
 
     private String nameOf(Object userId) {
