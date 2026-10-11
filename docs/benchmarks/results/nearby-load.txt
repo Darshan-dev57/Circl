@@ -1,0 +1,18 @@
+--- first run (load average: about 45, other builds running on the same box)
+== CACHE_TYPE=none
+     http_req_duration..............: avg=219.39ms med=207.33ms p(95)=491.63ms max=1.17s  
+   ✓ http_req_failed................: 0.00%   0 out of 6845
+     http_reqs......................: 6845    227.12833/s
+== CACHE_TYPE=redis
+     http_req_duration..............: avg=30.63ms med=24.07ms p(95)=72.55ms max=1.17s   
+   ✓ http_req_failed................: 0.00%   0 out of 47844
+     http_reqs......................: 47844   1594.494478/s
+--- second run (load average: 7.37, 43.47, 50.21)
+== CACHE_TYPE=none
+     http_req_duration..............: avg=299.29ms med=277.37ms p(95)=661.32ms max=1.82s  
+   ✓ http_req_failed................: 0.00%   0 out of 5025
+     http_reqs......................: 5025    166.387369/s
+== CACHE_TYPE=redis
+     http_req_duration..............: avg=36.83ms med=29.19ms p(95)=85.8ms  max=1.15s   
+   ✓ http_req_failed................: 0.00%   0 out of 39658
+     http_reqs......................: 39658   1317.691356/s

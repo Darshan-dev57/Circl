@@ -72,6 +72,8 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-circl}
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      # redis (default) or none, docs/benchmarks/nearby-load.sh compares both
+      CACHE_TYPE: ${CACHE_TYPE:-redis}
       # local only: http://localhost:8080/actuator/prometheus
       ACTUATOR_ENDPOINTS: health,info,prometheus
       # DEV ONLY fallbacks, put real secrets (32+ characters) in .env
