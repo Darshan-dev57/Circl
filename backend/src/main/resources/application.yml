@@ -102,4 +102,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # docker-compose.yml adds prometheus; the prod profile serves it on a separate port
+        include: ${ACTUATOR_ENDPOINTS:health,info}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,redis
