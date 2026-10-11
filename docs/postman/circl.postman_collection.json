@@ -172,7 +172,7 @@
                 "login"
               ]
             },
-            "description": "Works after loading scripts/demo_data.sql. Five wrong passwords block the email for 15 minutes.",
+            "description": "Works after loading scripts/sample_data.sql. Five wrong passwords block the email for 15 minutes.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"demo.host@circl.dev\",\n  \"password\": \"circl-demo-pass\"\n}"
