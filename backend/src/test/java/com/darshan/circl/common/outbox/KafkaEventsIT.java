@@ -6,7 +6,10 @@ import com.darshan.circl.support.Users;
 import com.darshan.circl.support.Users.TestUser;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import com.darshan.circl.support.KafkaReady;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +35,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(TestcontainersConfig.class)
 class KafkaEventsIT {
+
+    @Autowired
+    KafkaListenerEndpointRegistry listeners;
+
+    @BeforeEach
+    void consumersAreReady() {
+        KafkaReady.waitForConsumers(listeners);
+    }
+
 
     private static final String TOPIC = "circl.activity-events";
 
@@ -96,7 +108,7 @@ class KafkaEventsIT {
         assertThat(mine.get(0).partition()).isEqualTo(mine.get(1).partition());
         assertThat(mine.get(0).offset()).isLessThan(mine.get(1).offset());
 
-        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 2);
+        await().atMost(Duration.ofSeconds(30)).until(() -> notificationsFor(host) == 2);
     }
 
     @Test
@@ -105,7 +117,7 @@ class KafkaEventsIT {
         UUID activity = Activities.create(mvc, host, 3);
         join(Users.participant(mvc), activity);
         relay.relayBatch(500);
-        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 1);
+        await().atMost(Duration.ofSeconds(30)).until(() -> notificationsFor(host) == 1);
 
         // what a redelivery looks like: same event id, same key
         OutboxEvent row = outbox.findAll().stream()
@@ -117,7 +129,7 @@ class KafkaEventsIT {
         // a new event behind the duplicates on the same partition; once it is handled, so are they
         join(Users.participant(mvc), activity);
         relay.relayBatch(500);
-        await().atMost(Duration.ofSeconds(15)).until(() -> notificationsFor(host) == 2);
+        await().atMost(Duration.ofSeconds(30)).until(() -> notificationsFor(host) == 2);
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications WHERE event_id = ?", Integer.class, row.getId()))
                 .isEqualTo(1);

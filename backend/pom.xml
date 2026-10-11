@@ -141,6 +141,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <!-- same order on every machine, so a CI failure can be replayed locally -->
+                    <runOrder>alphabetical</runOrder>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
