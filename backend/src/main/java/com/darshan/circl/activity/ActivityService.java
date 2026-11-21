@@ -9,6 +9,7 @@ import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.outbox.Outbox;
 import com.darshan.circl.common.text.TextSanitizer;
+import com.darshan.circl.participation.WaitlistOffers;
 import com.darshan.circl.config.CacheConfig;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -32,14 +33,16 @@ public class ActivityService {
     private final ApplicationEventPublisher events;
     private final Outbox outbox;
     private final Clock clock;
+    private final WaitlistOffers waitlistOffers;
 
     public ActivityService(ActivityRepository activities, ActivityMapper mapper, ApplicationEventPublisher events,
-                           Outbox outbox, Clock clock) {
+                           Outbox outbox, Clock clock, WaitlistOffers waitlistOffers) {
         this.activities = activities;
         this.mapper = mapper;
         this.events = events;
         this.outbox = outbox;
         this.clock = clock;
+        this.waitlistOffers = waitlistOffers;
     }
 
     @CacheEvict(cacheNames = CacheConfig.NEARBY, allEntries = true)
@@ -134,9 +137,10 @@ public class ActivityService {
     @CacheEvict(cacheNames = CacheConfig.NEARBY, allEntries = true)
     @Transactional
     public void cancel(UUID id, UUID userId, boolean admin) {
-        Activity activity = find(id);
+        Activity activity = activities.findByIdForUpdate(id).orElseThrow(() -> new NotFoundException("Activity", id));
         requireHost(activity, userId, admin);
         activity.cancel();
+        waitlistOffers.cancelOutstandingOffers(id);
         outbox.append(id, "ActivityCancelled", Map.of("activityId", id));
     }
 
