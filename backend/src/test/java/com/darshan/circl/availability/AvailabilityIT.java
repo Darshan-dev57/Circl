@@ -59,9 +59,13 @@ class AvailabilityIT {
     }
 
     private ResultActions postFree(TestUser u, double lat, double lng, int minutes) throws Exception {
+        return postFree(u, "CRICKET", lat, lng, minutes);
+    }
+
+    private ResultActions postFree(TestUser u, String category, double lat, double lng, int minutes) throws Exception {
         return mvc.perform(post("/api/v1/availability").header("Authorization", u.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"category\":\"CRICKET\",\"minutes\":%d,\"lat\":%s,\"lng\":%s}".formatted(minutes, lat, lng)));
+                .content("{\"category\":\"%s\",\"minutes\":%d,\"lat\":%s,\"lng\":%s}".formatted(category, minutes, lat, lng)));
     }
 
     private ResultActions search(TestUser u, double lat, double lng) throws Exception {
@@ -111,6 +115,15 @@ class AvailabilityIT {
         search(meera, LAT, LNG).andExpect(jsonPath("$", hasSize(1)));
         mvc.perform(delete("/api/v1/availability/me").header("Authorization", ravi.bearer())).andExpect(status().isNoContent());
         search(meera, LAT, LNG).andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void changingCategoryAtomicallyRemovesTheOldGeoEntry() throws Exception {
+        postFree(ravi, "CRICKET", LAT, LNG, 60);
+        postFree(ravi, "FOOTBALL", LAT, LNG, 60);
+        assertThat(redis.opsForGeo().position("avail:geo:CRICKET", ravi.id().toString())).containsOnlyNulls();
+        assertThat(redis.opsForGeo().position("avail:geo:FOOTBALL", ravi.id().toString())).hasSize(1);
+        assertThat(redis.opsForZSet().score(AvailabilityService.EXPIRY_KEY, ravi.id().toString())).isNotNull();
     }
 
     @Test

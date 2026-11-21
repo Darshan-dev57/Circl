@@ -1,6 +1,8 @@
 package com.darshan.circl.participation;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -41,6 +43,11 @@ public interface ParticipantRepository extends JpaRepository<Participant, UUID> 
                                  @Param("size") int size);
 
     Optional<Participant> findByActivityIdAndUserId(UUID activityId, UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Participant p where p.activityId = :activityId and p.userId = :userId")
+    Optional<Participant> findByActivityIdAndUserIdForUpdate(@Param("activityId") UUID activityId,
+                                                              @Param("userId") UUID userId);
 
     long countByActivityIdAndStatus(UUID activityId, ParticipantStatus status);
 

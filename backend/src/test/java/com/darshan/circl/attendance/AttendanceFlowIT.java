@@ -244,6 +244,23 @@ class AttendanceFlowIT {
     }
 
     @Test
+    void hostCannotChangeAttendanceAfterReliabilityScoreWasApplied() throws Exception {
+        endedHoursAgo(3);
+        finalizer.finalizeDue();
+        jdbc.update("UPDATE participants SET no_show_at = now() - interval '49 hours' WHERE id = ?", participantId(alice));
+        reliability.applyDueScores();
+        assertThat(score(alice)).isEqualTo(33);
+
+        mvc.perform(post("/api/v1/activities/{id}/attendance/{uid}/evidence", activityId, alice.id())
+                        .header("Authorization", host.bearer()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"late correction\",\"markAttended\":true}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.type").value(endsWith("attendance-score-final")));
+        assertThat(attendance(alice)).isEqualTo("NO_SHOW");
+        assertThat(score(alice)).isEqualTo(33);
+    }
+
+    @Test
     void noPenaltyWhenCheckInWasDownThatDay() throws Exception {
         endedHoursAgo(3);
         finalizer.finalizeDue();

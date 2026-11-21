@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -39,12 +40,14 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
+    SecurityFilterChain api(HttpSecurity http, ObjectMapper json,
+                            @Value("${circl.cors.allowed-origins:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173}") List<String> origins) throws Exception {
         http
                 // APIs use bearer tokens; the only cookie is the SameSite=Strict refresh cookie on /api/v1/auth
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {
                 })
+                .addFilterBefore(new RefreshCookieOriginFilter(origins), BearerTokenAuthenticationFilter.class)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
@@ -110,7 +113,7 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) {
+            @Value("${circl.cors.allowed-origins:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173}") List<String> origins) {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(origins);
         cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
