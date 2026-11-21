@@ -8,6 +8,7 @@ import com.darshan.circl.identity.dto.SignupRequest;
 import com.darshan.circl.identity.dto.TokenResponse;
 import com.darshan.circl.identity.dto.UserResponse;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,8 +40,9 @@ public class AuthController {
     }
 
     @PostMapping("/auth/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return withCookie(HttpStatus.OK, auth.login(request));
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        // Use the socket peer, not a client-controlled X-Forwarded-For value.
+        return withCookie(HttpStatus.OK, auth.login(request, servletRequest.getRemoteAddr()));
     }
 
     @PostMapping("/auth/refresh")
