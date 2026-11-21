@@ -5,6 +5,7 @@ import com.darshan.circl.common.error.ForbiddenException;
 import com.darshan.circl.common.error.NotFoundException;
 import com.darshan.circl.common.error.RuleViolationException;
 import com.darshan.circl.common.outbox.Outbox;
+import com.darshan.circl.participation.WaitlistOffers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,10 +24,11 @@ class ActivityServiceTest {
 
     ActivityRepository repo = mock(ActivityRepository.class);
     ActivityService service;
+    WaitlistOffers waitlistOffers = mock(WaitlistOffers.class);
 
     @BeforeEach
     void setUp() {
-        service = new ActivityService(repo, new ActivityMapper(), event -> { }, mock(Outbox.class), Clock.systemUTC());
+        service = new ActivityService(repo, new ActivityMapper(), event -> { }, mock(Outbox.class), Clock.systemUTC(), waitlistOffers);
     }
 
     @Test
@@ -48,7 +50,7 @@ class ActivityServiceTest {
         Activity a = new Activity(hostId, "Coffee", Category.COFFEE, null, 12.9, 77.6,
                 Instant.now().plus(1, ChronoUnit.DAYS), 60, 4);
         UUID id = UUID.randomUUID();
-        when(repo.findById(id)).thenReturn(Optional.of(a));
+        when(repo.findByIdForUpdate(id)).thenReturn(Optional.of(a));
 
         assertThatThrownBy(() -> service.cancel(id, UUID.randomUUID(), false))
                 .isInstanceOf(ForbiddenException.class);
