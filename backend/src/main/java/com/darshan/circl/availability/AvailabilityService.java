@@ -18,6 +18,7 @@ import org.springframework.data.geo.Metrics;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +40,51 @@ import java.util.UUID;
 public class AvailabilityService {
 
     static final String EXPIRY_KEY = "avail:exp";
+
+    private static final DefaultRedisScript<Long> UPSERT_POST = new DefaultRedisScript<>("""
+            local user = ARGV[1]
+            local oldCat = redis.call('HGET', KEYS[1], 'cat')
+            if oldCat then redis.call('ZREM', 'avail:geo:' .. oldCat, user) end
+            redis.call('HSET', KEYS[1], 'cat', ARGV[2], 'until', ARGV[3], 'name', ARGV[7])
+            redis.call('EXPIRE', KEYS[1], tonumber(ARGV[4]))
+            redis.call('GEOADD', 'avail:geo:' .. ARGV[2], ARGV[5], ARGV[6], user)
+            redis.call('ZADD', 'avail:exp', ARGV[3], user)
+            return 1
+            """, Long.class);
+
+    private static final DefaultRedisScript<Long> REMOVE_POST = new DefaultRedisScript<>("""
+            local user = ARGV[1]
+            local oldCat = redis.call('HGET', KEYS[1], 'cat')
+            if oldCat then redis.call('ZREM', 'avail:geo:' .. oldCat, user) end
+            redis.call('DEL', KEYS[1])
+            redis.call('ZREM', 'avail:exp', user)
+            return 1
+            """, Long.class);
+
+    private static final DefaultRedisScript<Long> CLEANUP_MEMBER = new DefaultRedisScript<>("""
+            local user = ARGV[1]
+            local now = tonumber(ARGV[2])
+            local score = redis.call('ZSCORE', KEYS[1], user)
+            local untilValue = redis.call('HGET', KEYS[2], 'until')
+            if score and tonumber(score) <= now and (not untilValue or tonumber(untilValue) <= now) then
+              for i = 3, #KEYS do redis.call('ZREM', KEYS[i], user) end
+              redis.call('ZREM', KEYS[1], user)
+              return 1
+            end
+            return 0
+            """, Long.class);
+
+    private static final DefaultRedisScript<Long> CLEANUP_CATEGORY = new DefaultRedisScript<>("""
+            local user = ARGV[1]
+            local now = tonumber(ARGV[2])
+            local untilValue = redis.call('HGET', KEYS[1], 'until')
+            if not untilValue or tonumber(untilValue) <= now then
+              redis.call('ZREM', KEYS[2], user)
+              redis.call('ZREM', KEYS[3], user)
+              return 1
+            end
+            return 0
+            """, Long.class);
 
     private final StringRedisTemplate redis;
     private final UserRepository users;
@@ -67,17 +113,10 @@ public class AvailabilityService {
 
     public AvailabilityResponse post(UUID userId, PostAvailabilityRequest req) {
         User user = users.findById(userId).orElseThrow(() -> new NotFoundException("User", userId));
-        removePost(userId);
-
         Instant until = Instant.now(clock).plus(Duration.ofMinutes(req.minutes()));
-        String key = postKey(userId);
-        redis.opsForHash().putAll(key, Map.of(
-                "cat", req.category().name(),
-                "until", String.valueOf(until.getEpochSecond()),
-                "name", user.getName()));
-        redis.expire(key, Duration.ofMinutes(req.minutes()));
-        redis.opsForGeo().add(geoKey(req.category()), new Point(snap(req.lng()), snap(req.lat())), userId.toString());
-        redis.opsForZSet().add(EXPIRY_KEY, userId.toString(), until.getEpochSecond());
+        redis.execute(UPSERT_POST, List.of(postKey(userId)), userId.toString(), req.category().name(),
+                String.valueOf(until.getEpochSecond()), String.valueOf(Duration.ofMinutes(req.minutes()).toSeconds()),
+                String.valueOf(snap(req.lng())), String.valueOf(snap(req.lat())), user.getName());
         return new AvailabilityResponse(req.category(), until);
     }
 
@@ -118,8 +157,8 @@ public class AvailabilityService {
             long until = post.isEmpty() ? 0 : Long.parseLong((String) post.get("until"));
             if (until <= now) {
                 // the hash expired but GEO members never do, so clean it up here too
-                redis.opsForGeo().remove(geoKey(category), member);
-                redis.opsForZSet().remove(EXPIRY_KEY, member);
+                redis.execute(CLEANUP_CATEGORY, List.of(postKey(UUID.fromString(member)), geoKey(category), EXPIRY_KEY),
+                        member, String.valueOf(now));
                 continue;
             }
             people.add(new NearbyPerson(UUID.fromString(member), (String) post.get("name"), category,
@@ -142,22 +181,33 @@ public class AvailabilityService {
         if (expired == null || expired.isEmpty()) {
             return 0;
         }
-        for (String member : expired) {
-            for (Category c : Category.values()) {
-                redis.opsForGeo().remove(geoKey(c), member);
-            }
-            redis.opsForZSet().remove(EXPIRY_KEY, member);
+        int removed = 0;
+        List<String> keys = new ArrayList<>();
+        keys.add(EXPIRY_KEY);
+        for (Category c : Category.values()) {
+            keys.add(geoKey(c));
         }
-        return expired.size();
+        for (String member : expired) {
+            Long result = redis.execute(CLEANUP_MEMBER, cleanupKeys(member, keys), member, String.valueOf(now));
+            if (Objects.equals(result, 1L)) {
+                removed++;
+            }
+        }
+        return removed;
     }
 
     private void removePost(UUID userId) {
-        Object oldCategory = redis.opsForHash().get(postKey(userId), "cat");
-        if (oldCategory != null) {
-            redis.opsForGeo().remove(geoKey(Category.valueOf((String) oldCategory)), userId.toString());
+        redis.execute(REMOVE_POST, List.of(postKey(userId)), userId.toString());
+    }
+
+    private static List<String> cleanupKeys(String member, List<String> keys) {
+        List<String> result = new ArrayList<>();
+        result.add(EXPIRY_KEY);
+        result.add(postKey(UUID.fromString(member)));
+        for (int i = 1; i < keys.size(); i++) {
+            result.add(keys.get(i));
         }
-        redis.delete(postKey(userId));
-        redis.opsForZSet().remove(EXPIRY_KEY, userId.toString());
+        return result;
     }
 
     private void enforceRateLimit(UUID userId) {
