@@ -82,6 +82,16 @@ public class WaitlistOffers {
         WaitlistEntry offer = waitlist.findById(offerId)
                 .filter(o -> o.getUserId().equals(userId))
                 .orElseThrow(() -> new NotFoundException("Offer", offerId));
+
+        // Serialize claims with cancellation, expiry and capacity changes on the activity row.
+        Activity activity = activities.findByIdForUpdate(offer.getActivityId())
+                .orElseThrow(() -> new NotFoundException("Activity", offer.getActivityId()));
+        if (!activity.isOpen()) {
+            throw new ConflictException("activity-not-open", "This activity has been cancelled");
+        }
+        if (!activity.getStartsAt().isAfter(now)) {
+            throw new ConflictException("activity-started", "Waitlist offers cannot be claimed after the activity starts");
+        }
         if (waitlist.claim(offerId, userId, now) == 0) {
             throw new ConflictException("offer-expired", "This offer is no longer open");
         }
@@ -97,6 +107,27 @@ public class WaitlistOffers {
         outbox.append(offer.getActivityId(), "WaitlistClaimed",
                 Map.of("activityId", offer.getActivityId(), "userId", userId, "offerId", offerId));
         return participant;
+    }
+
+    /**
+     * Closes all outstanding waitlist reservations when the activity is cancelled.
+     * The caller must already hold the activity row lock and the surrounding transaction.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void cancelOutstandingOffers(UUID activityId) {
+        for (WaitlistEntry offer : waitlist.findByActivityIdAndStatusOrderByPosition(activityId, WaitlistStatus.OFFERED)) {
+            if (waitlist.closeOffer(offer.getId(), WaitlistStatus.EXPIRED) == 0) {
+                continue;
+            }
+            // closeOffer clears the persistence context, so reacquire the locked activity.
+            Activity activity = activities.findByIdForUpdate(activityId)
+                    .orElseThrow(() -> new NotFoundException("Activity", activityId));
+            activity.setSeatsTaken(activity.getSeatsTaken() - offer.getPartySize());
+            ledger.record(activityId, -offer.getPartySize(), LedgerReason.EXPIRE, offer.getId());
+            outbox.append(activityId, "WaitlistOfferCancelled", Map.of(
+                    "activityId", activityId, "userId", offer.getUserId(), "offerId", offer.getId()));
+        }
+        waitlist.expireWaiting(activityId);
     }
 
     @Transactional
