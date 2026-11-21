@@ -104,9 +104,13 @@ public class AttendanceService {
     public Participant hostEvidence(UUID activityId, UUID hostId, UUID userId, String note, boolean markAttended) {
         Activity activity = activity(activityId);
         requireHost(activity, hostId);
-        Participant p = participants.findByActivityIdAndUserId(activityId, userId)
+        Participant p = participants.findByActivityIdAndUserIdForUpdate(activityId, userId)
                 .filter(x -> x.getStatus() == ParticipantStatus.JOINED)
                 .orElseThrow(() -> new NotFoundException("Participant", userId));
+        if (p.isScoreApplied()) {
+            throw new RuleViolationException("attendance-score-final",
+                    "Reliability scoring is already final; attendance can no longer be changed");
+        }
         String cleanNote = TextSanitizer.plainText(note);
         if (cleanNote != null) {
             p.addHostEvidence(cleanNote);
