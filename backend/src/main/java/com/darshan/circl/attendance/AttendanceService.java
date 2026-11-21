@@ -107,7 +107,7 @@ public class AttendanceService {
         Participant p = participants.findByActivityIdAndUserIdForUpdate(activityId, userId)
                 .filter(x -> x.getStatus() == ParticipantStatus.JOINED)
                 .orElseThrow(() -> new NotFoundException("Participant", userId));
-        if (p.isScoreApplied()) {
+        if (markAttended && p.isScoreApplied()) {
             throw new RuleViolationException("attendance-score-final",
                     "Reliability scoring is already final; attendance can no longer be changed");
         }
