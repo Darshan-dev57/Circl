@@ -6,6 +6,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 /**
  * Counts failed logins per email in Redis (fixed window). After too many the email is
@@ -27,27 +31,38 @@ public class LoginAttempts {
         this.window = window;
     }
 
-    private static String key(String email) {
-        return "login:fail:" + email;
+    private static String key(String email, String remoteIp) {
+        return "login:fail:" + digest(email) + ":" + digest(remoteIp == null ? "unknown" : remoteIp);
     }
 
-    public void checkAllowed(String email) {
-        String value = redis.opsForValue().get(key(email));
+    private static String digest(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is unavailable", impossible);
+        }
+    }
+
+    public void checkAllowed(String email, String remoteIp) {
+        String key = key(email, remoteIp);
+        String value = redis.opsForValue().get(key);
         if (value != null && Integer.parseInt(value) >= maxFailures) {
-            Long ttl = redis.getExpire(key(email));
+            Long ttl = redis.getExpire(key);
             throw new TooManyRequestsException("Too many failed logins, try again later",
                     ttl == null || ttl < 0 ? window.toSeconds() : ttl);
         }
     }
 
-    public void recordFailure(String email) {
-        Long count = redis.opsForValue().increment(key(email));
+    public void recordFailure(String email, String remoteIp) {
+        String key = key(email, remoteIp);
+        Long count = redis.opsForValue().increment(key);
         if (count != null && count == 1) {
-            redis.expire(key(email), window);
+            redis.expire(key, window);
         }
     }
 
-    public void reset(String email) {
-        redis.delete(key(email));
+    public void reset(String email, String remoteIp) {
+        redis.delete(key(email, remoteIp));
     }
 }
