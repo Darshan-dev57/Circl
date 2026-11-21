@@ -41,7 +41,7 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json,
-                            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) throws Exception {
+                            @Value("${circl.cors.allowed-origins:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173}") List<String> origins) throws Exception {
         http
                 // APIs use bearer tokens; the only cookie is the SameSite=Strict refresh cookie on /api/v1/auth
                 .csrf(csrf -> csrf.disable())
@@ -113,7 +113,7 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) {
+            @Value("${circl.cors.allowed-origins:http://localhost,http://127.0.0.1,http://localhost:5173,http://127.0.0.1:5173}") List<String> origins) {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(origins);
         cors.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
