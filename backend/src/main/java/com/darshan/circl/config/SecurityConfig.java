@@ -41,13 +41,13 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain api(HttpSecurity http, ObjectMapper json,
-                            RefreshCookieOriginFilter refreshCookieOriginFilter) throws Exception {
+                            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) throws Exception {
         http
                 // APIs use bearer tokens; the only cookie is the SameSite=Strict refresh cookie on /api/v1/auth
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {
                 })
-                .addFilterBefore(refreshCookieOriginFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(new RefreshCookieOriginFilter(origins), BearerTokenAuthenticationFilter.class)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
@@ -109,12 +109,6 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);
-    }
-
-    @Bean
-    RefreshCookieOriginFilter refreshCookieOriginFilter(
-            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) {
-        return new RefreshCookieOriginFilter(origins);
     }
 
     @Bean
