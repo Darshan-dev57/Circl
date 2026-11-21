@@ -195,6 +195,27 @@ class WaitlistOfferIT {
     }
 
     @Test
+    void cancellingActivityExpiresOutstandingOffersAndReleasesReservedSeats() throws Exception {
+        TestUser joined = Users.participant(mvc);
+        TestUser waiting = Users.participant(mvc);
+        join(joined, 2);
+        join(Users.participant(mvc), 2);
+        join(waiting, 2).andExpect(jsonPath("$.status").value("WAITLISTED"));
+        leave(joined);
+        assertThat(waitlistStatus(waiting)).isEqualTo("OFFERED");
+        assertThat(seatsTaken()).isEqualTo(4);
+
+        mvc.perform(delete("/api/v1/activities/{id}", activityId).header("Authorization", host.bearer()))
+                .andExpect(status().isNoContent());
+
+        assertThat(waitlistStatus(waiting)).isEqualTo("EXPIRED");
+        assertThat(seatsTaken()).isEqualTo(2);
+        mvc.perform(post("/api/v1/waitlist/offers/{id}/claim", offerId(waiting))
+                        .header("Authorization", waiting.bearer()))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void partySizeIsLimited() throws Exception {
         join(Users.participant(mvc), 5).andExpect(status().isBadRequest());
     }
