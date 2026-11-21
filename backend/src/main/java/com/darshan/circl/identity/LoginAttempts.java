@@ -5,16 +5,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Counts failed logins per account/IP pair in Redis (fixed window). A remote client cannot
- * lock an account for every other network by deliberately guessing its password. If Redis
- * is down login fails closed rather than allowing unlimited guessing.
+ * Counts failed logins per account/IP pair and per IP in Redis (fixed windows). The pair
+ * limit reduces remote account-lockout abuse; the IP limit also slows password spraying
+ * across many accounts. If Redis is down login fails closed rather than allowing guessing.
  */
 @Component
 public class LoginAttempts {
