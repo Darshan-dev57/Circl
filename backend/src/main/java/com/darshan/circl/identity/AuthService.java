@@ -73,17 +73,17 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenResponse login(LoginRequest req) {
+    public TokenResponse login(LoginRequest req, String remoteIp) {
         String email = normalizeEmail(req.email());
-        attempts.checkAllowed(email);
+        attempts.checkAllowed(email, remoteIp);
         User user = users.findByEmail(email).orElse(null);
         String hash = user == null ? dummyHash : user.getPasswordHash();
         boolean ok = passwords.matches(req.password(), hash);
         if (user == null || !ok) {
-            attempts.recordFailure(email);
+            attempts.recordFailure(email, remoteIp);
             throw new UnauthorizedException("Email or password is wrong");
         }
-        attempts.reset(email);
+        attempts.reset(email, remoteIp);
         return issueTokens(user);
     }
 
