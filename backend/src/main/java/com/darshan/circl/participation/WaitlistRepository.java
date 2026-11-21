@@ -35,6 +35,14 @@ public interface WaitlistRepository extends JpaRepository<WaitlistEntry, UUID> {
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
+            update WaitlistEntry w set w.status = com.darshan.circl.participation.WaitlistStatus.EXPIRED
+             where w.activityId = :activityId
+               and w.status = com.darshan.circl.participation.WaitlistStatus.WAITING
+            """)
+    int expireWaiting(@Param("activityId") UUID activityId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
             update WaitlistEntry w set w.status = com.darshan.circl.participation.WaitlistStatus.CLAIMED
              where w.id = :id and w.userId = :userId
                and w.status = com.darshan.circl.participation.WaitlistStatus.OFFERED
