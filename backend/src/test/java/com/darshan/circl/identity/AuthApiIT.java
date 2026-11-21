@@ -87,6 +87,32 @@ class AuthApiIT {
     }
 
     @Test
+    void failedLoginLimitIsScopedToTheAccountAndSourceIp() throws Exception {
+        Users.TestUser u = Users.participant(mvc);
+        String wrong = "{\"email\":\"" + u.email() + "\",\"password\":\"incorrect\"}";
+        for (int i = 0; i < 5; i++) {
+            mvc.perform(post("/api/v1/auth/login").with(request -> {
+                        request.setRemoteAddr("203.0.113.10");
+                        return request;
+                    }).contentType(MediaType.APPLICATION_JSON).content(wrong))
+                    .andExpect(status().isUnauthorized());
+        }
+        mvc.perform(post("/api/v1/auth/login").with(request -> {
+                    request.setRemoteAddr("203.0.113.10");
+                    return request;
+                }).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + u.email() + "\",\"password\":\"correct-horse-1\"}"))
+                .andExpect(status().isTooManyRequests());
+
+        mvc.perform(post("/api/v1/auth/login").with(request -> {
+                    request.setRemoteAddr("203.0.113.11");
+                    return request;
+                }).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + u.email() + "\",\"password\":\"correct-horse-1\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void cannotSignUpAsAdmin() throws Exception {
         mvc.perform(post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
                         {"email":"sneaky@test.dev","password":"s3cret-pass","name":"x","role":"ADMIN"}
