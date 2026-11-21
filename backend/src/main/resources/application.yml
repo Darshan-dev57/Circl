@@ -65,6 +65,10 @@ circl:
   auth:
     # turn on (COOKIE_SECURE=true) when the app is served over https
     cookie-secure: ${COOKIE_SECURE:false}
+  login:
+    max-failures: 5
+    ip-max-failures: 30
+    window: 15m
   checkin:
     # DEV ONLY default, set CIRCL_CHECKIN_SECRET (32+ bytes) everywhere else
     secret: ${CIRCL_CHECKIN_SECRET:dev-only-checkin-secret-change-me-0123456789}
