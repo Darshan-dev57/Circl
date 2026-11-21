@@ -12,9 +12,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Counts failed logins per email in Redis (fixed window). After too many the email is
- * blocked until the window ends. If Redis is down login fails closed rather than allowing
- * unlimited guessing.
+ * Counts failed logins per account/IP pair in Redis (fixed window). A remote client cannot
+ * lock an account for every other network by deliberately guessing its password. If Redis
+ * is down login fails closed rather than allowing unlimited guessing.
  */
 @Component
 public class LoginAttempts {
