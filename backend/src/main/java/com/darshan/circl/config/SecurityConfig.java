@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -39,12 +40,14 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain api(HttpSecurity http, ObjectMapper json) throws Exception {
+    SecurityFilterChain api(HttpSecurity http, ObjectMapper json,
+                            RefreshCookieOriginFilter refreshCookieOriginFilter) throws Exception {
         http
                 // APIs use bearer tokens; the only cookie is the SameSite=Strict refresh cookie on /api/v1/auth
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {
                 })
+                .addFilterBefore(refreshCookieOriginFilter, BearerTokenAuthenticationFilter.class)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
@@ -106,6 +109,12 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);
+    }
+
+    @Bean
+    RefreshCookieOriginFilter refreshCookieOriginFilter(
+            @Value("${circl.cors.allowed-origins:http://localhost:5173}") List<String> origins) {
+        return new RefreshCookieOriginFilter(origins);
     }
 
     @Bean
