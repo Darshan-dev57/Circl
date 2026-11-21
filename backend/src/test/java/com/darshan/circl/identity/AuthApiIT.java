@@ -181,18 +181,32 @@ class AuthApiIT {
                         containsString("HttpOnly"), containsString("SameSite=Strict"), containsString("Path=/api/v1/auth"))))
                 .andReturn().getResponse().getCookie("circl_refresh");
 
-        Cookie rotated = mvc.perform(post("/api/v1/auth/refresh").cookie(sent))
+        Cookie rotated = mvc.perform(post("/api/v1/auth/refresh").cookie(sent).header("Origin", "http://localhost:5173"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andReturn().getResponse().getCookie("circl_refresh");
         assertThat(rotated.getValue()).isNotEqualTo(sent.getValue());
 
         // the old cookie was rotated away, so sending it again is reuse
-        mvc.perform(post("/api/v1/auth/refresh").cookie(sent)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(sent).header("Origin", "http://localhost:5173")).andExpect(status().isUnauthorized());
 
-        mvc.perform(post("/api/v1/auth/logout").cookie(rotated))
+        mvc.perform(post("/api/v1/auth/logout").cookie(rotated).header("Origin", "http://localhost:5173"))
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("Set-Cookie", containsString("Max-Age=0")));
+    }
+
+    @Test
+    void refreshCookieRequiresAnAllowedOrigin() throws Exception {
+        Users.TestUser u = Users.participant(mvc);
+        Cookie cookie = mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + u.email() + "\",\"password\":\"correct-horse-1\"}"))
+                .andReturn().getResponse().getCookie("circl_refresh");
+        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie).header("Origin", "https://attacker.example"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/auth/refresh").cookie(cookie).header("Origin", "http://localhost:5173"))
+                .andExpect(status().isOk());
     }
 
     @Test
